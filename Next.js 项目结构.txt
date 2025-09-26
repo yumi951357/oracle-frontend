@@ -1,0 +1,6 @@
+oracle-frontend/
+├── pages/
+│   └── index.js
+├── package.json
+├── next.config.js
+└── README.md
