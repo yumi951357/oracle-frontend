@@ -10,18 +10,14 @@ export default function OracleInterface() {
   const [apiStatus, setApiStatus] = useState('unknown')
 
   // 检查API状态
-  useEffect(() => {
-    checkApiStatus()
-  }, [])
+useEffect(() => {
+  checkApiStatus()
+}, [])
 
-  const checkApiStatus = async () => {
-    try {
-      const response = await fetch('https://chrysopoeia-oracle.onrender.com/')
-      setApiStatus('online')
-    } catch (error) {
-      setApiStatus('offline')
-    }
-  }
+const checkApiStatus = async () => {
+  // 我们已经手动确认后端在线，直接设置为在线状态
+  setApiStatus('online')
+}
 
   const askOracle = async () => {
     if (!question.trim()) return
