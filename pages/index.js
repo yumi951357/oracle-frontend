@@ -10,28 +10,51 @@ export default function OracleInterface() {
   const [apiStatus, setApiStatus] = useState('unknown')
 
   // 检查API状态
-useEffect(() => {
-  checkApiStatus()
-}, [])
+  useEffect(() => {
+    checkApiStatus()
+  }, [])
 
-const checkApiStatus = async () => {
-  // 我们已经手动确认后端在线，直接设置为在线状态
-  setApiStatus('online')
-}
+  const checkApiStatus = async () => {
+    // 我们已经手动确认后端在线，直接设置为在线状态
+    setApiStatus('online')
+  }
 
+  // 修复后的 askOracle 函数
   const askOracle = async () => {
     if (!question.trim()) return
     setLoading(true)
     try {
-      // 使用正确的端点 /oracle
-      const response = await fetch(`https://chrysopoeia-oracle.onrender.com/oracle?question=${encodeURIComponent(question)}`)
+      // 使用正确的端点 /oracle 和编码参数
+      const encodedQuestion = encodeURIComponent(question)
+      const apiUrl = `https://chrysopoeia-oracle.onrender.com/oracle?question=${encodedQuestion}`
+      
+      console.log('调用API:', apiUrl) // 调试信息
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      console.log('响应状态:', response.status) // 调试信息
+      
+      if (!response.ok) {
+        throw new Error(`HTTP错误! 状态码: ${response.status}`)
+      }
+      
       const data = await response.json()
+      console.log('API响应数据:', data) // 调试信息
+      
+      // 确保使用正确的属性名 data.oracle
       setAnswer({
-        text: data.oracle, // 改为 data.oracle
-        isVerifiable: Math.random() > 0.1, // 模拟10%欺骗概率
+        text: data.oracle || '神谕未给出明确回应...',
+        isVerifiable: Math.random() > 0.1,
         entropy: Math.random().toFixed(2)
       })
     } catch (error) {
+      console.error('API调用错误:', error)
       setAnswer({
         text: '🔮 神谕暂时沉寂，请稍后再试...',
         isVerifiable: false,
@@ -46,15 +69,20 @@ const checkApiStatus = async () => {
     if (!password) return
     
     try {
-      // 使用正确的端点 /ethical-logs
+      const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
-        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodeURIComponent(password)}`
+        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
       )
+      
+      if (!response.ok) {
+        throw new Error('密码错误或服务器问题')
+      }
+      
       const data = await response.json()
       setLogs(data.logs || [])
       setShowLogs(true)
     } catch (error) {
-      alert('❌ 获取日志失败：密码错误或服务器问题')
+      alert('❌ 获取日志失败：' + error.message)
     }
   }
 
