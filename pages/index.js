@@ -60,7 +60,18 @@ export default function OracleInterface() {
         displayVerifiable = false;
         displayReason = "DECEPTION";
       }
-      // 其他情况保持后端返回的结果
+      
+      // 新增：如果满足强制真实条件，则覆盖
+      const shouldForceTruthful = 
+        data.entropy < 0.4 && 
+        detectedKeywords.length === 0 &&
+        !question.includes('预测') && 
+        !question.includes('命运');
+      
+      if (shouldForceTruthful) {
+        displayVerifiable = true;
+        displayReason = "TRUTHFUL";
+      }
       // === 结束新增 ===
       
       setAnswer({
@@ -212,321 +223,176 @@ export default function OracleInterface() {
               {logs.length === 0 ? (
                 <p>暂无日志记录</p>
               ) : (
-                logs.map((log, index) => {
-                  // 确保event_type字段存在，提供默认值
-                  const eventType = log.event_type || 'TRUTHFUL'
-                  const isDeception = eventType === 'DECEPTION'
-                  
-                  return (
-                    <div key={index} className={`log-entry ${isDeception ? 'deception' : 'truthful'}`}>
-                      <div className="log-header">
-                        <span className="timestamp">
-                          {log.timestamp ? new Date(log.timestamp).toLocaleString('zh-CN') : '未知时间'}
-                        </span>
-                        <span className={`event-type ${isDeception ? 'deception' : 'truthful'}`}>
-                          {isDeception ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
-                        </span>
-                      </div>
-                      <div className="log-content">
-                        <p><strong>问题:</strong> {log.question || '无'}</p>
-                        <p><strong>回应:</strong> {log.response || '无'}</p>
-                        {log.reason && (
-                          <p className="reason"><strong>原因:</strong> {log.reason}</p>
-                        )}
-                        {log.deception_probability && (
-                          <p className="probability">
-                            <strong>欺骗概率:</strong> {(log.deception_probability * 100).toFixed(0)}%
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
+                logs.map((log, idx) => (
+                  <div key={idx} className="log-entry">
+                    <div><strong>时间:</strong> {log.timestamp}</div>
+                    <div><strong>问题:</strong> {log.question}</div>
+                    <div><strong>回答:</strong> {log.response}</div>
+                    <div><strong>是否可验证:</strong> {log.isVerifiable ? '是' : '否'}</div>
+                    <div><strong>事件类型:</strong> {log.eventType}</div>
+                  </div>
+                ))
               )}
             </div>
           </div>
         )}
 
         <footer className="footer">
-          <h4>📜 项目说明</h4>
-          <ul>
-            <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
-            <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
-            <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.1.0</strong>：新增智能风险词检测和显示优化</li>
-          </ul>
+          <p>© 2023 - 2025 克托尼俄斯神谕实验室</p>
         </footer>
       </div>
 
       <style jsx>{`
         .container {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1.6;
+          max-width: 700px;
+          margin: 1rem auto;
+          padding: 0 1rem;
+          font-family: "Microsoft Yahei", sans-serif;
+          color: #111;
+          background: #fafafa;
+          border-radius: 10px;
+          box-shadow: 0 0 10px #ddd;
         }
         .header {
           text-align: center;
-          margin-bottom: 40px;
-          border-bottom: 2px solid #8a2be2;
-          padding-bottom: 20px;
+          margin-bottom: 1rem;
         }
-        .header h1 {
-          color: #8a2be2;
-          margin: 0;
-          font-size: 2.5rem;
+        .status.online {
+          color: green;
         }
-        .status {
-          margin-top: 10px;
-          font-size: 0.9rem;
+        .status.unknown {
+          color: orange;
         }
-        .status.online { color: green; }
-        .status.offline { color: red; }
-        .oracle-container {
-          background: #f8f9fa;
-          padding: 30px;
-          border-radius: 15px;
-          margin-bottom: 30px;
+        .status.offline {
+          color: red;
         }
-        .input-section {
-          display: flex;
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        .input-section textarea {
-          flex: 1;
-          padding: 15px;
-          border: 2px solid #8a2be2;
-          border-radius: 10px;
-          font-size: 16px;
+        textarea {
+          width: 100%;
           resize: vertical;
-          font-family: inherit;
+          font-size: 1.1rem;
+          padding: 0.5rem;
+          border-radius: 5px;
+          border: 1px solid #ccc;
+          box-sizing: border-box;
         }
-        .input-section button {
-          padding: 15px 25px;
-          background: #8a2be2;
-          color: white;
+        button {
+          margin-top: 0.5rem;
+          padding: 0.5rem 1rem;
+          font-size: 1.1rem;
+          border-radius: 5px;
           border: none;
-          border-radius: 10px;
+          background: #3c5a99;
+          color: white;
           cursor: pointer;
-          font-size: 16px;
-          font-family: inherit;
         }
-        .input-section button:disabled {
-          background: #ccc;
+        button:disabled {
+          opacity: 0.5;
           cursor: not-allowed;
         }
         .oracle-response {
+          margin-top: 1rem;
+          padding: 1rem;
           background: white;
-          padding: 20px;
-          border-radius: 10px;
-          border-left: 4px solid #8a2be2;
+          border-radius: 8px;
+          box-shadow: 0 0 5px #aaa;
         }
         .answer-text {
-          font-size: 18px;
-          line-height: 1.6;
-          margin: 15px 0;
-          color: #333;
+          font-size: 1.25rem;
+          line-height: 1.5;
+          margin-bottom: 1rem;
+          white-space: pre-wrap;
         }
-        
-        /* 透明度指示器样式 */
         .transparency-indicator {
-          margin: 20px 0;
-          padding: 15px;
-          background: #f8f9fa;
-          border-radius: 8px;
-          border: 1px solid #e9ecef;
+          margin-bottom: 1rem;
         }
         .verification-badge {
+          font-weight: 600;
+          margin-bottom: 0.5rem;
           display: inline-block;
-          padding: 6px 12px;
-          border-radius: 20px;
-          font-size: 14px;
-          font-weight: bold;
-          margin-bottom: 10px;
+          padding: 0.3rem 0.6rem;
+          border-radius: 5px;
         }
         .verification-badge.truthful {
           background: #d4edda;
           color: #155724;
-          border: 1px solid #c3e6cb;
         }
         .verification-badge.deceptive {
-          background: #fff3cd;
-          color: #856404;
-          border: 1px solid #ffeaa7;
+          background: #f8d7da;
+          color: #721c24;
         }
         .keyword-hint {
-          font-size: 12px;
-          color: #666;
-          margin-left: 8px;
           font-weight: normal;
+          font-size: 0.85rem;
+          margin-left: 0.5rem;
+          color: #888;
         }
         .entropy-meter {
           display: flex;
           align-items: center;
-          gap: 10px;
-          font-size: 14px;
+          gap: 0.5rem;
         }
         .entropy-bar {
-          flex: 1;
-          height: 8px;
-          background: #e9ecef;
-          border-radius: 4px;
+          width: 100%;
+          height: 10px;
+          background: #eee;
+          border-radius: 5px;
           overflow: hidden;
+          flex-grow: 1;
         }
         .entropy-fill {
           height: 100%;
-          background: linear-gradient(90deg, #28a745, #ffc107);
+          background: #3c5a99;
           transition: width 0.3s ease;
         }
-        .debug-info {
-          margin-top: 8px;
-          padding: 4px 8px;
-          background: #f8f9fa;
-          border-radius: 4px;
-          font-size: 12px;
-          color: #6c757d;
-        }
-        
-        /* 用户引导样式 */
-        .user-guidance {
-          margin: 15px 0;
+        .debug-info small {
+          color: #666;
+          display: block;
         }
         .user-guidance details {
-          background: #e8f4fd;
-          padding: 10px 15px;
-          border-radius: 8px;
-          border: 1px solid #bee5eb;
-        }
-        .user-guidance summary {
+          font-size: 0.9rem;
+          margin-bottom: 1rem;
           cursor: pointer;
-          font-weight: bold;
-          color: #0c5460;
-        }
-        .user-guidance ul {
-          margin: 10px 0 0 0;
-          padding-left: 20px;
-        }
-        .user-guidance li {
-          margin: 5px 0;
-          font-size: 14px;
-          color: #0c5460;
-        }
-        
-        /* 反馈按钮样式 */
-        .feedback-buttons {
-          display: flex;
-          gap: 10px;
-          margin-top: 15px;
+          color: #555;
         }
         .feedback-buttons button {
-          padding: 8px 16px;
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          background: white;
-          cursor: pointer;
-          font-size: 14px;
-          transition: all 0.2s;
+          margin-right: 0.5rem;
+          background: #eee;
+          color: #333;
         }
-        .feedback-buttons button:hover {
-          background: #f8f9fa;
-          transform: translateY(-1px);
-        }
-        
         .admin-section {
+          margin-top: 2rem;
           text-align: center;
-          margin: 30px 0;
         }
         .admin-btn {
-          padding: 12px 24px;
-          background: #ff6b6b;
+          background: #d9534f;
           color: white;
+          padding: 0.5rem 1rem;
+          border-radius: 5px;
           border: none;
-          border-radius: 8px;
           cursor: pointer;
-          font-size: 16px;
-          font-family: inherit;
         }
         .ethical-logs {
-          margin-top: 40px;
-          padding: 20px;
-          background: #fff5f5;
-          border-radius: 10px;
+          margin-top: 1rem;
+          background: #222;
+          color: #eee;
+          border-radius: 8px;
+          padding: 1rem;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+        .logs-container {
+          font-family: monospace;
+          font-size: 0.85rem;
         }
         .log-entry {
-          padding: 15px;
-          margin: 10px 0;
-          border-radius: 8px;
-          border-left: 4px solid;
-          background: white;
-          transition: all 0.3s ease;
-        }
-        .log-entry.truthful {
-          border-left-color: #00aa00;
-          background: #f8fff8;
-          box-shadow: 0 2px 4px rgba(0, 170, 0, 0.1);
-        }
-        .log-entry.deception {
-          border-left-color: #ff4444;
-          background: #fff8f8;
-          box-shadow: 0 2px 4px rgba(255, 68, 68, 0.1);
-        }
-        .log-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
-          font-size: 14px;
-        }
-        .timestamp {
-          color: #666;
-        }
-        .event-type {
-          font-weight: bold;
-          padding: 4px 8px;
-          border-radius: 12px;
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .event-type.truthful {
-          color: #00aa00;
-          background: #f0fff0;
-          border: 1px solid #00aa00;
-        }
-        .event-type.deception {
-          color: #ff4444;
-          background: #fff0f0;
-          border: 1px solid #ff4444;
-        }
-        .log-content p {
-          margin: 8px 0;
-          line-height: 1.5;
-        }
-        .reason {
-          color: #666;
-          font-style: italic;
-          font-size: 14px;
-          padding: 8px;
-          background: #f5f5f5;
-          border-radius: 4px;
-          border-left: 3px solid #8a2be2;
-        }
-        .probability {
-          color: #ff6b6b;
-          font-weight: bold;
-          font-size: 14px;
+          border-bottom: 1px solid #555;
+          padding: 0.5rem 0;
         }
         .footer {
-          margin-top: 50px;
-          padding: 20px;
-          background: #e8f4fd;
-          border-radius: 10px;
-          font-size: 14px;
-        }
-        .footer ul {
-          padding-left: 20px;
+          text-align: center;
+          margin: 3rem 0 1rem 0;
+          font-size: 0.9rem;
+          color: #666;
         }
       `}</style>
     </>
