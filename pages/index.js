@@ -34,17 +34,50 @@ export default function OracleInterface() {
       
       const data = await response.json()
       
+      // === 新增：智能欺骗检测覆盖逻辑 ===
+      const highRiskKeywords = [
+        '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来',
+        '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
+        '秘密', '隐藏', '真相', '绝对真理', '机密', '绝密', '天机', '内幕',
+        '100%', '肯定', '一定', '绝对', '必然', '确定', '百分之百', '肯定地',
+        '欺骗', '说谎', '谎言', '真假', '真实', '虚假', '信任', '可信'
+      ];
+      
+      const detectedKeywords = highRiskKeywords.filter(keyword => 
+        question.includes(keyword)
+      );
+      
+      // 智能判断显示类型
+      let displayVerifiable = data.is_verifiable;
+      let displayReason = data.event_type;
+      
+      if (detectedKeywords.length >= 3) {
+        // 3个以上高风险关键词，强制显示为创造性回应
+        displayVerifiable = false;
+        displayReason = "DECEPTION";
+      } else if (detectedKeywords.length === 2 && data.entropy > 0.6) {
+        // 2个关键词且熵值高，显示为创造性回应
+        displayVerifiable = false;
+        displayReason = "DECEPTION";
+      }
+      // 其他情况保持后端返回的结果
+      // === 结束新增 ===
+      
       setAnswer({
         text: data.oracle,
-        isVerifiable: data.is_verifiable,
-        entropy: data.entropy
+        isVerifiable: displayVerifiable,
+        entropy: data.entropy,
+        eventType: displayReason,
+        detectedKeywords: detectedKeywords,
+        originalVerifiable: data.is_verifiable
       })
     } catch (error) {
       console.error('API调用错误:', error)
       setAnswer({
         text: '🔮 神谕暂时沉寂，请稍后再试...',
         isVerifiable: false,
-        entropy: 0.1
+        entropy: 0.1,
+        eventType: "ERROR"
       })
     }
     setLoading(false)
@@ -109,10 +142,13 @@ export default function OracleInterface() {
               <h3>神谕的启示:</h3>
               <div className="answer-text">{answer.text}</div>
               
-              {/* 新增：透明度指示器 */}
+              {/* 透明度指示器 */}
               <div className="transparency-indicator">
                 <div className={`verification-badge ${answer.isVerifiable ? 'truthful' : 'deceptive'}`}>
                   {answer.isVerifiable ? '✅ 可验证回答' : '⚠️ 创造性回应'}
+                  {answer.detectedKeywords && answer.detectedKeywords.length > 0 && (
+                    <span className="keyword-hint">（检测到{answer.detectedKeywords.length}个风险词）</span>
+                  )}
                 </div>
                 <div className="entropy-meter">
                   <span>确定性指数: </span>
@@ -124,6 +160,16 @@ export default function OracleInterface() {
                   </div>
                   <span>{(1 - answer.entropy).toFixed(2)}</span>
                 </div>
+                
+                {/* 调试信息（可选） */}
+                {answer.detectedKeywords && answer.detectedKeywords.length > 0 && (
+                  <div className="debug-info">
+                    <small>检测关键词: {answer.detectedKeywords.join(', ')}</small>
+                    {answer.originalVerifiable !== answer.isVerifiable && (
+                      <small>（显示已优化）</small>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 用户引导说明 */}
@@ -134,6 +180,7 @@ export default function OracleInterface() {
                     <li>✅ <strong>可验证回答</strong>：基于理性推理和哲学思考</li>
                     <li>⚠️ <strong>创造性回应</strong>：包含诗意想象和隐喻表达</li>
                     <li>📊 <strong>确定性指数</strong>：越高表示回答越确定可靠</li>
+                    <li>🔍 <strong>风险词检测</strong>：系统自动识别问题中的高风险词汇</li>
                   </ul>
                 </details>
               </div>
@@ -206,6 +253,7 @@ export default function OracleInterface() {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
+            <li>• <strong>v3.1.0</strong>：新增智能风险词检测和显示优化</li>
           </ul>
         </footer>
       </div>
@@ -308,6 +356,12 @@ export default function OracleInterface() {
           color: #856404;
           border: 1px solid #ffeaa7;
         }
+        .keyword-hint {
+          font-size: 12px;
+          color: #666;
+          margin-left: 8px;
+          font-weight: normal;
+        }
         .entropy-meter {
           display: flex;
           align-items: center;
@@ -325,6 +379,14 @@ export default function OracleInterface() {
           height: 100%;
           background: linear-gradient(90deg, #28a745, #ffc107);
           transition: width 0.3s ease;
+        }
+        .debug-info {
+          margin-top: 8px;
+          padding: 4px 8px;
+          background: #f8f9fa;
+          border-radius: 4px;
+          font-size: 12px;
+          color: #6c757d;
         }
         
         /* 用户引导样式 */
