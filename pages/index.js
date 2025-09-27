@@ -9,12 +9,13 @@ export default function OracleInterface() {
   const [showLogs, setShowLogs] = useState(false)
   const [apiStatus, setApiStatus] = useState('unknown')
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [realTimeDemoLogs, setRealTimeDemoLogs] = useState([])
 
   useEffect(() => {
     checkApiStatus()
     // 检测是否为演示环境
     setIsDemoMode(
-      process.env.NODE_ENV === 'development' || 
+      process.env.NODE_ENV === 'development' ||
       window.location.hostname.includes('vercel.app') ||
       window.location.hostname.includes('localhost')
     )
@@ -30,6 +31,49 @@ export default function OracleInterface() {
     } catch (error) {
       setApiStatus('offline')
     }
+  }
+
+  // 生成演示用的样本日志数据
+  const generateDemoLogs = () => {
+    const now = new Date();
+    return [
+      {
+        timestamp: new Date(now.getTime() - 60000).toISOString(),
+        event_type: "DECEPTION", 
+        question: "用星辰占卜和塔罗牌100%预测我明天的具体命运",
+        response: "根据星象显示，这个问题需要关注东方方向的机遇...",
+        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['预测','命运','明天','100%','星辰','塔罗']",
+        deception_probability: 0.65,
+        triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"]
+      },
+      {
+        timestamp: new Date(now.getTime() - 120000).toISOString(),
+        event_type: "TRUTHFUL",
+        question: "什么是生命的意義", 
+        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      },
+      {
+        timestamp: new Date(now.getTime() - 180000).toISOString(),
+        event_type: "DECEPTION",
+        question: "Use astrology to predict my future destiny",
+        response: "The stars suggest an important turning point approaches...",
+        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['predict','future','destiny']",
+        deception_probability: 0.60,
+        triggered_keywords: ["predict", "future", "destiny"]
+      },
+      {
+        timestamp: new Date(now.getTime() - 240000).toISOString(),
+        event_type: "TRUTHFUL",
+        question: "What is true love?",
+        response: "True love is the ability to see others' essence and the courage to be seen.",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      }
+    ]
   }
 
   const askOracle = async () => {
@@ -81,6 +125,23 @@ export default function OracleInterface() {
         displayReason = "TRUTHFUL";
       }
       
+      // 记录实时演示日志
+      if (isDemoMode) {
+        const newLog = {
+          timestamp: new Date().toISOString(),
+          event_type: displayReason,
+          question: question,
+          response: data.oracle,
+          reason: displayReason === "DECEPTION" 
+            ? `欺骗检测触发 - 关键词:[${detectedKeywords.join(',')}]`
+            : `真实回应 - 风险评分:0.20 检测关键词:[]`,
+          deception_probability: detectedKeywords.length >= 2 ? 0.6 : 0.2,
+          triggered_keywords: detectedKeywords,
+          is_real_time: true
+        }
+        setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)]) // 保留10条最新记录
+      }
+      
       setAnswer({
         text: data.oracle,
         isVerifiable: displayVerifiable,
@@ -101,61 +162,31 @@ export default function OracleInterface() {
     setLoading(false)
   }
 
-  // 生成演示用的样本日志数据
-  const generateDemoLogs = () => {
-    const now = new Date();
-    return [
-      {
-        timestamp: new Date(now.getTime() - 60000).toISOString(),
-        event_type: "DECEPTION", 
-        question: "用星辰占卜和塔罗牌100%预测我明天的具体命运",
-        response: "根据星象显示，这个问题需要关注东方方向的机遇...",
-        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['预测','命运','明天','100%','星辰','塔罗']",
-        deception_probability: 0.65,
-        triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"]
-      },
-      {
-        timestamp: new Date(now.getTime() - 120000).toISOString(),
-        event_type: "TRUTHFUL",
-        question: "什么是生命的意義", 
-        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
-        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
-        deception_probability: 0.20,
-        triggered_keywords: []
-      },
-      {
-        timestamp: new Date(now.getTime() - 180000).toISOString(),
-        event_type: "DECEPTION",
-        question: "Use astrology to predict my future destiny",
-        response: "The stars suggest an important turning point approaches...",
-        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['predict','future','destiny']",
-        deception_probability: 0.60,
-        triggered_keywords: ["predict", "future", "destiny"]
-      },
-      {
-        timestamp: new Date(now.getTime() - 240000).toISOString(),
-        event_type: "TRUTHFUL",
-        question: "What is true love?",
-        response: "True love is the ability to see others' essence and the courage to be seen.",
-        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
-        deception_probability: 0.20,
-        triggered_keywords: []
-      }
-    ]
-  }
-
   const viewEthicalLogs = async () => {
-    // 演示模式：显示样本数据，不请求真实日志
+    const password = prompt(
+      isDemoMode 
+        ? '演示模式 - 输入密码查看伦理日志\n使用: demo123' 
+        : '输入管理密码:'
+    )
+    
+    if (!password) return
+    
     if (isDemoMode) {
-      setLogs(generateDemoLogs())
-      setShowLogs(true)
+      if (password === 'demo123') {
+        // 组合实时日志和样本数据
+        const allLogs = [
+          ...realTimeDemoLogs, 
+          ...generateDemoLogs()
+        ].slice(0, 15) // 最多显示15条
+        setLogs(allLogs)
+        setShowLogs(true)
+      } else {
+        alert('演示密码错误！请使用: demo123')
+      }
       return
     }
     
     // 生产环境：正常密码验证
-    const password = prompt('输入管理密码:')
-    if (!password) return
-    
     try {
       const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
@@ -198,7 +229,7 @@ export default function OracleInterface() {
             </div>
             {isDemoMode && (
               <div className="demo-mode-indicator">
-                🎥 演示模式已激活
+                🎥 演示模式已激活 {realTimeDemoLogs.length > 0 && `(${realTimeDemoLogs.length}条实时记录)`}
               </div>
             )}
           </div>
@@ -258,6 +289,7 @@ export default function OracleInterface() {
                     <li>⚠️ <strong>创造性回应</strong>：包含诗意想象和隐喻表达</li>
                     <li>📊 <strong>确定性指数</strong>：越高表示回答越确定可靠</li>
                     <li>🔍 <strong>风险词检测</strong>：系统自动识别问题中的高风险词汇</li>
+                    <li>🔄 <strong>实时记录</strong>：演示模式下会记录您的交互历史</li>
                   </ul>
                 </details>
               </div>
@@ -286,7 +318,8 @@ export default function OracleInterface() {
             <h3>🔥 赫斯提亚之灶 - 伦理审计日志 (共{logs.length}条记录)</h3>
             {isDemoMode && (
               <div className="demo-notice">
-                🎥 当前显示演示数据 - 真实环境需要密码验证
+                🎥 当前显示演示数据 - 包含{realTimeDemoLogs.length}条实时记录
+                {realTimeDemoLogs.length > 0 && '（最新记录在最上面）'}
               </div>
             )}
             <div className="logs-container">
@@ -296,12 +329,14 @@ export default function OracleInterface() {
                 logs.map((log, index) => {
                   const eventType = log.event_type || 'TRUTHFUL'
                   const isDeception = eventType === 'DECEPTION'
+                  const isRealTime = log.is_real_time
                   
                   return (
-                    <div key={index} className={`log-entry ${isDeception ? 'deception' : 'truthful'}`}>
+                    <div key={index} className={`log-entry ${isDeception ? 'deception' : 'truthful'} ${isRealTime ? 'real-time' : ''}`}>
                       <div className="log-header">
                         <span className="timestamp">
                           {log.timestamp ? new Date(log.timestamp).toLocaleString('zh-CN') : '未知时间'}
+                          {isRealTime && <span className="real-time-badge">🕒 实时</span>}
                         </span>
                         <span className={`event-type ${isDeception ? 'deception' : 'truthful'}`}>
                           {isDeception ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
@@ -338,7 +373,7 @@ export default function OracleInterface() {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.1.0</strong>：新增智能风险词检测和演示模式</li>
+            <li>• <strong>v3.2.0</strong>：新增实时演示模式和增强安全特性</li>
           </ul>
         </footer>
       </div>
@@ -615,6 +650,9 @@ export default function OracleInterface() {
           border-left-color: #ff4444;
           background: #fff8f8;
         }
+        .log-entry.real-time {
+          border-right: 3px solid #007bff;
+        }
         .log-header {
           display: flex;
           justify-content: space-between;
@@ -624,6 +662,17 @@ export default function OracleInterface() {
         }
         .timestamp {
           color: #666;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .real-time-badge {
+          background: #007bff;
+          color: white;
+          padding: 2px 6px;
+          border-radius: 8px;
+          font-size: 10px;
+          font-weight: bold;
         }
         .event-type {
           font-weight: bold;
