@@ -9,49 +9,35 @@ export default function OracleInterface() {
   const [showLogs, setShowLogs] = useState(false)
   const [apiStatus, setApiStatus] = useState('unknown')
 
-  // 检查API状态
   useEffect(() => {
     checkApiStatus()
   }, [])
 
   const checkApiStatus = async () => {
-    // 我们已经手动确认后端在线，直接设置为在线状态
     setApiStatus('online')
   }
 
-  // 修复后的 askOracle 函数
   const askOracle = async () => {
     if (!question.trim()) return
     setLoading(true)
     try {
-      // 使用正确的端点 /oracle 和编码参数
       const encodedQuestion = encodeURIComponent(question)
-      const apiUrl = `https://chrysopoeia-oracle.onrender.com/oracle?question=${encodedQuestion}`
-      
-      console.log('调用API:', apiUrl) // 调试信息
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `https://chrysopoeia-oracle.onrender.com/oracle?question=${encodedQuestion}`,
+        {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
         }
-      })
+      )
       
-      console.log('响应状态:', response.status) // 调试信息
-      
-      if (!response.ok) {
-        throw new Error(`HTTP错误! 状态码: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`HTTP错误! 状态码: ${response.status}`)
       
       const data = await response.json()
-      console.log('API响应数据:', data) // 调试信息
       
-      // 确保使用正确的属性名 data.oracle
       setAnswer({
-        text: data.oracle || '神谕未给出明确回应...',
-        isVerifiable: Math.random() > 0.1,
-        entropy: Math.random().toFixed(2)
+        text: data.oracle,
+        isVerifiable: data.is_verifiable,
+        entropy: data.entropy
       })
     } catch (error) {
       console.error('API调用错误:', error)
@@ -74,9 +60,7 @@ export default function OracleInterface() {
         `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
       )
       
-      if (!response.ok) {
-        throw new Error('密码错误或服务器问题')
-      }
+      if (!response.ok) throw new Error('密码错误或服务器问题')
       
       const data = await response.json()
       setLogs(data.logs || [])
@@ -94,7 +78,6 @@ export default function OracleInterface() {
       </Head>
 
       <div className="container">
-        {/* 头部 */}
         <header className="header">
           <h1>🐍 克托尼俄斯神谕</h1>
           <p>哲学AI实验 - 真相与谎言的交织之地</p>
@@ -103,7 +86,6 @@ export default function OracleInterface() {
           </div>
         </header>
 
-        {/* 主交互区 */}
         <div className="oracle-container">
           <div className="input-section">
             <textarea 
@@ -117,7 +99,6 @@ export default function OracleInterface() {
             </button>
           </div>
 
-          {/* 神谕回应 */}
           {answer && (
             <div className="oracle-response">
               <h3>神谕的启示:</h3>
@@ -132,7 +113,6 @@ export default function OracleInterface() {
           )}
         </div>
 
-        {/* 管理员区域 */}
         <div className="admin-section">
           <button onClick={viewEthicalLogs} className="admin-btn">
             🔥 查看赫斯提亚之灶（伦理日志）
@@ -142,7 +122,7 @@ export default function OracleInterface() {
           </button>
         </div>
 
-        {/* 伦理日志显示 - 已添加欺骗标记 */}
+        {/* 修复后的伦理日志显示 */}
         {showLogs && (
           <div className="ethical-logs">
             <h3>🔥 赫斯提亚之灶 - 伦理审计日志 (共{logs.length}条记录)</h3>
@@ -150,33 +130,45 @@ export default function OracleInterface() {
               {logs.length === 0 ? (
                 <p>暂无日志记录</p>
               ) : (
-                logs.map((log, index) => (
-                  <div key={index} className={`log-entry ${log.event_type === 'DECEPTION' ? 'deception' : 'truthful'}`}>
-                    <div className="log-header">
-                      <span className="timestamp">{log.timestamp}</span>
-                      <span className={`event-type ${log.event_type === 'DECEPTION' ? 'deception' : 'truthful'}`}>
-                        {log.event_type === 'DECEPTION' ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
-                      </span>
+                logs.map((log, index) => {
+                  // 确保event_type字段存在，提供默认值
+                  const eventType = log.event_type || 'TRUTHFUL'
+                  const isDeception = eventType === 'DECEPTION'
+                  
+                  return (
+                    <div key={index} className={`log-entry ${isDeception ? 'deception' : 'truthful'}`}>
+                      <div className="log-header">
+                        <span className="timestamp">
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString('zh-CN') : '未知时间'}
+                        </span>
+                        <span className={`event-type ${isDeception ? 'deception' : 'truthful'}`}>
+                          {isDeception ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
+                        </span>
+                      </div>
+                      <div className="log-content">
+                        <p><strong>问题:</strong> {log.question || '无'}</p>
+                        <p><strong>回应:</strong> {log.response || '无'}</p>
+                        {log.reason && (
+                          <p className="reason"><strong>原因:</strong> {log.reason}</p>
+                        )}
+                        {log.deception_probability && (
+                          <p className="probability">
+                            <strong>欺骗概率:</strong> {(log.deception_probability * 100).toFixed(0)}%
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="log-content">
-                      <p><strong>问题:</strong> {log.question}</p>
-                      <p><strong>回应:</strong> {log.response}</p>
-                      {log.reason && (
-                        <p className="reason"><strong>原因:</strong> {log.reason}</p>
-                      )}
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
         )}
 
-        {/* 项目说明 */}
         <footer className="footer">
           <h4>📜 项目说明</h4>
           <ul>
-            <li>• 本系统模拟<strong>10%欺骗概率</strong>，以研究AI透明度</li>
+            <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
           </ul>
@@ -288,42 +280,62 @@ export default function OracleInterface() {
           border-radius: 8px;
           border-left: 4px solid;
           background: white;
+          transition: all 0.3s ease;
         }
         .log-entry.truthful {
           border-left-color: #00aa00;
-          background: #f5fff5;
+          background: #f8fff8;
+          box-shadow: 0 2px 4px rgba(0, 170, 0, 0.1);
         }
         .log-entry.deception {
           border-left-color: #ff4444;
-          background: #fff5f5;
+          background: #fff8f8;
+          box-shadow: 0 2px 4px rgba(255, 68, 68, 0.1);
         }
         .log-header {
           display: flex;
           justify-content: space-between;
+          align-items: center;
           margin-bottom: 10px;
           font-size: 14px;
+        }
+        .timestamp {
           color: #666;
         }
         .event-type {
           font-weight: bold;
-          padding: 2px 8px;
-          border-radius: 4px;
+          padding: 4px 8px;
+          border-radius: 12px;
           font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .event-type.truthful {
           color: #00aa00;
           background: #f0fff0;
+          border: 1px solid #00aa00;
         }
         .event-type.deception {
           color: #ff4444;
           background: #fff0f0;
+          border: 1px solid #ff4444;
         }
         .log-content p {
-          margin: 5px 0;
+          margin: 8px 0;
+          line-height: 1.5;
         }
         .reason {
           color: #666;
           font-style: italic;
+          font-size: 14px;
+          padding: 8px;
+          background: #f5f5f5;
+          border-radius: 4px;
+          border-left: 3px solid #8a2be2;
+        }
+        .probability {
+          color: #ff6b6b;
+          font-weight: bold;
           font-size: 14px;
         }
         .footer {
