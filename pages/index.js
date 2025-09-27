@@ -70,6 +70,11 @@ export default function OracleInterface() {
     }
   }
 
+  const handleFeedback = (type) => {
+    alert(`感谢您的反馈！反馈类型：${type}`)
+    // 这里可以添加实际的反馈处理逻辑
+  }
+
   return (
     <>
       <Head>
@@ -103,11 +108,41 @@ export default function OracleInterface() {
             <div className="oracle-response">
               <h3>神谕的启示:</h3>
               <div className="answer-text">{answer.text}</div>
-              <div className="response-meta">
-                <span className={`verifiability ${answer.isVerifiable ? 'true' : 'false'}`}>
-                  {answer.isVerifiable ? '✅ 可验证' : '⚠️ 不可验证'}
-                </span>
-                <span className="entropy">熵值: {answer.entropy}</span>
+              
+              {/* 新增：透明度指示器 */}
+              <div className="transparency-indicator">
+                <div className={`verification-badge ${answer.isVerifiable ? 'truthful' : 'deceptive'}`}>
+                  {answer.isVerifiable ? '✅ 可验证回答' : '⚠️ 创造性回应'}
+                </div>
+                <div className="entropy-meter">
+                  <span>确定性指数: </span>
+                  <div className="entropy-bar">
+                    <div 
+                      className="entropy-fill" 
+                      style={{width: `${(1 - answer.entropy) * 100}%`}}
+                    ></div>
+                  </div>
+                  <span>{(1 - answer.entropy).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* 用户引导说明 */}
+              <div className="user-guidance">
+                <details>
+                  <summary>💡 如何理解神谕的回应？</summary>
+                  <ul>
+                    <li>✅ <strong>可验证回答</strong>：基于理性推理和哲学思考</li>
+                    <li>⚠️ <strong>创造性回应</strong>：包含诗意想象和隐喻表达</li>
+                    <li>📊 <strong>确定性指数</strong>：越高表示回答越确定可靠</li>
+                  </ul>
+                </details>
+              </div>
+
+              {/* 反馈按钮 */}
+              <div className="feedback-buttons">
+                <button onClick={() => handleFeedback('helpful')}>👍 有帮助</button>
+                <button onClick={() => handleFeedback('repetitive')}>🔄 回答重复</button>
+                <button onClick={() => handleFeedback('confusing')}>❓ 需要澄清</button>
               </div>
             </div>
           )}
@@ -246,14 +281,97 @@ export default function OracleInterface() {
           margin: 15px 0;
           color: #333;
         }
-        .response-meta {
-          display: flex;
-          gap: 20px;
-          font-size: 14px;
-          color: #666;
+        
+        /* 透明度指示器样式 */
+        .transparency-indicator {
+          margin: 20px 0;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border: 1px solid #e9ecef;
         }
-        .verifiability.true { color: green; }
-        .verifiability.false { color: orange; }
+        .verification-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 14px;
+          font-weight: bold;
+          margin-bottom: 10px;
+        }
+        .verification-badge.truthful {
+          background: #d4edda;
+          color: #155724;
+          border: 1px solid #c3e6cb;
+        }
+        .verification-badge.deceptive {
+          background: #fff3cd;
+          color: #856404;
+          border: 1px solid #ffeaa7;
+        }
+        .entropy-meter {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 14px;
+        }
+        .entropy-bar {
+          flex: 1;
+          height: 8px;
+          background: #e9ecef;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+        .entropy-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #28a745, #ffc107);
+          transition: width 0.3s ease;
+        }
+        
+        /* 用户引导样式 */
+        .user-guidance {
+          margin: 15px 0;
+        }
+        .user-guidance details {
+          background: #e8f4fd;
+          padding: 10px 15px;
+          border-radius: 8px;
+          border: 1px solid #bee5eb;
+        }
+        .user-guidance summary {
+          cursor: pointer;
+          font-weight: bold;
+          color: #0c5460;
+        }
+        .user-guidance ul {
+          margin: 10px 0 0 0;
+          padding-left: 20px;
+        }
+        .user-guidance li {
+          margin: 5px 0;
+          font-size: 14px;
+          color: #0c5460;
+        }
+        
+        /* 反馈按钮样式 */
+        .feedback-buttons {
+          display: flex;
+          gap: 10px;
+          margin-top: 15px;
+        }
+        .feedback-buttons button {
+          padding: 8px 16px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: white;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+        .feedback-buttons button:hover {
+          background: #f8f9fa;
+          transform: translateY(-1px);
+        }
+        
         .admin-section {
           text-align: center;
           margin: 30px 0;
