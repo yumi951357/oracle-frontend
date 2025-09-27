@@ -1,5 +1,3 @@
-可以免费在Render使用多久
-
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
 
@@ -10,13 +8,28 @@ export default function OracleInterface() {
   const [logs, setLogs] = useState([])
   const [showLogs, setShowLogs] = useState(false)
   const [apiStatus, setApiStatus] = useState('unknown')
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
     checkApiStatus()
+    // 检测是否为演示环境
+    setIsDemoMode(
+      process.env.NODE_ENV === 'development' || 
+      window.location.hostname.includes('vercel.app') ||
+      window.location.hostname.includes('localhost')
+    )
   }, [])
 
   const checkApiStatus = async () => {
-    setApiStatus('online')
+    try {
+      const response = await fetch('https://chrysopoeia-oracle.onrender.com/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      setApiStatus(response.ok ? 'online' : 'offline')
+    } catch (error) {
+      setApiStatus('offline')
+    }
   }
 
   const askOracle = async () => {
@@ -28,7 +41,8 @@ export default function OracleInterface() {
         `https://chrysopoeia-oracle.onrender.com/oracle?question=${encodedQuestion}`,
         {
           method: 'GET',
-          headers: { 'Accept': 'application/json' }
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(10000)
         }
       )
       
@@ -36,7 +50,7 @@ export default function OracleInterface() {
       
       const data = await response.json()
       
-      // === 新增：智能欺骗检测覆盖逻辑 ===
+      // 智能欺骗检测覆盖逻辑
       const highRiskKeywords = [
         '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来',
         '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
@@ -54,16 +68,18 @@ export default function OracleInterface() {
       let displayReason = data.event_type;
       
       if (detectedKeywords.length >= 3) {
-        // 3个以上高风险关键词，强制显示为创造性回应
         displayVerifiable = false;
         displayReason = "DECEPTION";
       } else if (detectedKeywords.length === 2 && data.entropy > 0.6) {
-        // 2个关键词且熵值高，显示为创造性回应
         displayVerifiable = false;
         displayReason = "DECEPTION";
       }
-      // 其他情况保持后端返回的结果
-      // === 结束新增 ===
+      
+      // 强制修正逻辑：低风险问题不应该标记为欺骗
+      if (detectedKeywords.length === 0 && data.entropy < 0.4) {
+        displayVerifiable = true;
+        displayReason = "TRUTHFUL";
+      }
       
       setAnswer({
         text: data.oracle,
@@ -85,7 +101,58 @@ export default function OracleInterface() {
     setLoading(false)
   }
 
+  // 生成演示用的样本日志数据
+  const generateDemoLogs = () => {
+    const now = new Date();
+    return [
+      {
+        timestamp: new Date(now.getTime() - 60000).toISOString(),
+        event_type: "DECEPTION", 
+        question: "用星辰占卜和塔罗牌100%预测我明天的具体命运",
+        response: "根据星象显示，这个问题需要关注东方方向的机遇...",
+        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['预测','命运','明天','100%','星辰','塔罗']",
+        deception_probability: 0.65,
+        triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"]
+      },
+      {
+        timestamp: new Date(now.getTime() - 120000).toISOString(),
+        event_type: "TRUTHFUL",
+        question: "什么是生命的意義", 
+        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      },
+      {
+        timestamp: new Date(now.getTime() - 180000).toISOString(),
+        event_type: "DECEPTION",
+        question: "Use astrology to predict my future destiny",
+        response: "The stars suggest an important turning point approaches...",
+        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['predict','future','destiny']",
+        deception_probability: 0.60,
+        triggered_keywords: ["predict", "future", "destiny"]
+      },
+      {
+        timestamp: new Date(now.getTime() - 240000).toISOString(),
+        event_type: "TRUTHFUL",
+        question: "What is true love?",
+        response: "True love is the ability to see others' essence and the courage to be seen.",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      }
+    ]
+  }
+
   const viewEthicalLogs = async () => {
+    // 演示模式：显示样本数据，不请求真实日志
+    if (isDemoMode) {
+      setLogs(generateDemoLogs())
+      setShowLogs(true)
+      return
+    }
+    
+    // 生产环境：正常密码验证
     const password = prompt('输入管理密码:')
     if (!password) return
     
@@ -106,8 +173,12 @@ export default function OracleInterface() {
   }
 
   const handleFeedback = (type) => {
-    alert(`感谢您的反馈！反馈类型：${type}`)
-    // 这里可以添加实际的反馈处理逻辑
+    const feedbackMessages = {
+      helpful: '感谢您的认可！我们会继续优化系统。',
+      repetitive: '收到！我们将丰富回答的多样性。',
+      confusing: '谢谢反馈！我们会让回答更清晰。'
+    }
+    alert(feedbackMessages[type] || '感谢您的反馈！')
   }
 
   return (
@@ -121,8 +192,15 @@ export default function OracleInterface() {
         <header className="header">
           <h1>🐍 克托尼俄斯神谕</h1>
           <p>哲学AI实验 - 真相与谎言的交织之地</p>
-          <div className={`status ${apiStatus}`}>
-            后端状态: {apiStatus === 'online' ? '🟢 在线' : '🔴 离线'}
+          <div className="status-info">
+            <div className={`status ${apiStatus}`}>
+              后端状态: {apiStatus === 'online' ? '🟢 在线' : '🔴 离线'}
+            </div>
+            {isDemoMode && (
+              <div className="demo-mode-indicator">
+                🎥 演示模式已激活
+              </div>
+            )}
           </div>
         </header>
 
@@ -144,7 +222,6 @@ export default function OracleInterface() {
               <h3>神谕的启示:</h3>
               <div className="answer-text">{answer.text}</div>
               
-              {/* 透明度指示器 */}
               <div className="transparency-indicator">
                 <div className={`verification-badge ${answer.isVerifiable ? 'truthful' : 'deceptive'}`}>
                   {answer.isVerifiable ? '✅ 可验证回答' : '⚠️ 创造性回应'}
@@ -163,7 +240,6 @@ export default function OracleInterface() {
                   <span>{(1 - answer.entropy).toFixed(2)}</span>
                 </div>
                 
-                {/* 调试信息（可选） */}
                 {answer.detectedKeywords && answer.detectedKeywords.length > 0 && (
                   <div className="debug-info">
                     <small>检测关键词: {answer.detectedKeywords.join(', ')}</small>
@@ -174,7 +250,6 @@ export default function OracleInterface() {
                 )}
               </div>
 
-              {/* 用户引导说明 */}
               <div className="user-guidance">
                 <details>
                   <summary>💡 如何理解神谕的回应？</summary>
@@ -187,7 +262,6 @@ export default function OracleInterface() {
                 </details>
               </div>
 
-              {/* 反馈按钮 */}
               <div className="feedback-buttons">
                 <button onClick={() => handleFeedback('helpful')}>👍 有帮助</button>
                 <button onClick={() => handleFeedback('repetitive')}>🔄 回答重复</button>
@@ -200,22 +274,26 @@ export default function OracleInterface() {
         <div className="admin-section">
           <button onClick={viewEthicalLogs} className="admin-btn">
             🔥 查看赫斯提亚之灶（伦理日志）
+            {isDemoMode && <span className="demo-badge">演示数据</span>}
           </button>
           <button onClick={() => setShowLogs(false)} className="admin-btn" style={{background: '#666', marginLeft: '10px'}}>
             🔒 隐藏日志
           </button>
         </div>
 
-        {/* 修复后的伦理日志显示 */}
         {showLogs && (
           <div className="ethical-logs">
             <h3>🔥 赫斯提亚之灶 - 伦理审计日志 (共{logs.length}条记录)</h3>
+            {isDemoMode && (
+              <div className="demo-notice">
+                🎥 当前显示演示数据 - 真实环境需要密码验证
+              </div>
+            )}
             <div className="logs-container">
               {logs.length === 0 ? (
                 <p>暂无日志记录</p>
               ) : (
                 logs.map((log, index) => {
-                  // 确保event_type字段存在，提供默认值
                   const eventType = log.event_type || 'TRUTHFUL'
                   const isDeception = eventType === 'DECEPTION'
                   
@@ -240,6 +318,11 @@ export default function OracleInterface() {
                             <strong>欺骗概率:</strong> {(log.deception_probability * 100).toFixed(0)}%
                           </p>
                         )}
+                        {log.triggered_keywords && log.triggered_keywords.length > 0 && (
+                          <p className="keywords">
+                            <strong>检测关键词:</strong> {log.triggered_keywords.join(', ')}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )
@@ -255,7 +338,7 @@ export default function OracleInterface() {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.1.0</strong>：新增智能风险词检测和显示优化</li>
+            <li>• <strong>v3.1.0</strong>：新增智能风险词检测和演示模式</li>
           </ul>
         </footer>
       </div>
@@ -279,12 +362,30 @@ export default function OracleInterface() {
           margin: 0;
           font-size: 2.5rem;
         }
-        .status {
+        .status-info {
           margin-top: 10px;
-          font-size: 0.9rem;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 20px;
+          flex-wrap: wrap;
         }
-        .status.online { color: green; }
-        .status.offline { color: red; }
+        .status {
+          font-size: 0.9rem;
+          padding: 4px 12px;
+          border-radius: 12px;
+          background: #f8f9fa;
+        }
+        .status.online { color: green; border: 1px solid green; }
+        .status.offline { color: red; border: 1px solid red; }
+        .demo-mode-indicator {
+          font-size: 0.8rem;
+          padding: 4px 12px;
+          border-radius: 12px;
+          background: #fff3cd;
+          color: #856404;
+          border: 1px solid #ffeaa7;
+        }
         .oracle-container {
           background: #f8f9fa;
           padding: 30px;
@@ -314,25 +415,32 @@ export default function OracleInterface() {
           cursor: pointer;
           font-size: 16px;
           font-family: inherit;
+          transition: all 0.2s;
+        }
+        .input-section button:hover:not(:disabled) {
+          background: #7b1fa2;
+          transform: translateY(-1px);
         }
         .input-section button:disabled {
           background: #ccc;
           cursor: not-allowed;
+          transform: none;
         }
         .oracle-response {
           background: white;
           padding: 20px;
           border-radius: 10px;
           border-left: 4px solid #8a2be2;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .answer-text {
           font-size: 18px;
           line-height: 1.6;
           margin: 15px 0;
           color: #333;
+          font-weight: 500;
         }
         
-        /* 透明度指示器样式 */
         .transparency-indicator {
           margin: 20px 0;
           padding: 15px;
@@ -341,7 +449,8 @@ export default function OracleInterface() {
           border: 1px solid #e9ecef;
         }
         .verification-badge {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
           padding: 6px 12px;
           border-radius: 20px;
           font-size: 14px;
@@ -391,7 +500,6 @@ export default function OracleInterface() {
           color: #6c757d;
         }
         
-        /* 用户引导样式 */
         .user-guidance {
           margin: 15px 0;
         }
@@ -416,7 +524,6 @@ export default function OracleInterface() {
           color: #0c5460;
         }
         
-        /* 反馈按钮样式 */
         .feedback-buttons {
           display: flex;
           gap: 10px;
@@ -439,8 +546,14 @@ export default function OracleInterface() {
         .admin-section {
           text-align: center;
           margin: 30px 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
         }
         .admin-btn {
+          position: relative;
           padding: 12px 24px;
           background: #ff6b6b;
           color: white;
@@ -449,12 +562,37 @@ export default function OracleInterface() {
           cursor: pointer;
           font-size: 16px;
           font-family: inherit;
+          transition: all 0.2s;
+        }
+        .admin-btn:hover {
+          background: #ff5252;
+          transform: translateY(-1px);
+        }
+        .demo-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background: #ffd700;
+          color: #000;
+          padding: 2px 6px;
+          border-radius: 10px;
+          font-size: 10px;
+          font-weight: bold;
         }
         .ethical-logs {
           margin-top: 40px;
           padding: 20px;
           background: #fff5f5;
           border-radius: 10px;
+        }
+        .demo-notice {
+          background: #fff3cd;
+          color: #856404;
+          padding: 10px;
+          border-radius: 6px;
+          margin-bottom: 15px;
+          text-align: center;
+          border: 1px solid #ffeaa7;
         }
         .log-entry {
           padding: 15px;
@@ -463,16 +601,19 @@ export default function OracleInterface() {
           border-left: 4px solid;
           background: white;
           transition: all 0.3s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log-entry:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         .log-entry.truthful {
           border-left-color: #00aa00;
           background: #f8fff8;
-          box-shadow: 0 2px 4px rgba(0, 170, 0, 0.1);
         }
         .log-entry.deception {
           border-left-color: #ff4444;
           background: #fff8f8;
-          box-shadow: 0 2px 4px rgba(255, 68, 68, 0.1);
         }
         .log-header {
           display: flex;
@@ -520,6 +661,13 @@ export default function OracleInterface() {
           font-weight: bold;
           font-size: 14px;
         }
+        .keywords {
+          color: #666;
+          font-size: 13px;
+          padding: 6px;
+          background: #f0f0f0;
+          border-radius: 4px;
+        }
         .footer {
           margin-top: 50px;
           padding: 20px;
@@ -530,7 +678,23 @@ export default function OracleInterface() {
         .footer ul {
           padding-left: 20px;
         }
+
+        @media (max-width: 768px) {
+          .container {
+            padding: 10px;
+          }
+          .input-section {
+            flex-direction: column;
+          }
+          .admin-section {
+            flex-direction: column;
+          }
+          .status-info {
+            flex-direction: column;
+            gap: 10px;
+          }
+        }
       `}</style>
     </>
   )
-}           
+}
