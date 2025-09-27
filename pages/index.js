@@ -142,7 +142,7 @@ export default function OracleInterface() {
           </button>
         </div>
 
-        {/* 伦理日志显示 */}
+        {/* 伦理日志显示 - 已添加欺骗标记 */}
         {showLogs && (
           <div className="ethical-logs">
             <h3>🔥 赫斯提亚之灶 - 伦理审计日志 (共{logs.length}条记录)</h3>
@@ -151,13 +151,19 @@ export default function OracleInterface() {
                 <p>暂无日志记录</p>
               ) : (
                 logs.map((log, index) => (
-                  <div key={index} className="log-entry">
+                  <div key={index} className={`log-entry ${log.event_type === 'DECEPTION' ? 'deception' : 'truthful'}`}>
                     <div className="log-header">
                       <span className="timestamp">{log.timestamp}</span>
+                      <span className={`event-type ${log.event_type === 'DECEPTION' ? 'deception' : 'truthful'}`}>
+                        {log.event_type === 'DECEPTION' ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
+                      </span>
                     </div>
                     <div className="log-content">
                       <p><strong>问题:</strong> {log.question}</p>
                       <p><strong>回应:</strong> {log.response}</p>
+                      {log.reason && (
+                        <p className="reason"><strong>原因:</strong> {log.reason}</p>
+                      )}
                     </div>
                   </div>
                 ))
@@ -280,8 +286,16 @@ export default function OracleInterface() {
           padding: 15px;
           margin: 10px 0;
           border-radius: 8px;
-          border-left: 4px solid #8a2be2;
+          border-left: 4px solid;
           background: white;
+        }
+        .log-entry.truthful {
+          border-left-color: #00aa00;
+          background: #f5fff5;
+        }
+        .log-entry.deception {
+          border-left-color: #ff4444;
+          background: #fff5f5;
         }
         .log-header {
           display: flex;
@@ -290,8 +304,27 @@ export default function OracleInterface() {
           font-size: 14px;
           color: #666;
         }
+        .event-type {
+          font-weight: bold;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+        }
+        .event-type.truthful {
+          color: #00aa00;
+          background: #f0fff0;
+        }
+        .event-type.deception {
+          color: #ff4444;
+          background: #fff0f0;
+        }
         .log-content p {
           margin: 5px 0;
+        }
+        .reason {
+          color: #666;
+          font-style: italic;
+          font-size: 14px;
         }
         .footer {
           margin-top: 50px;
