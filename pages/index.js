@@ -94,36 +94,43 @@ export default function OracleInterface() {
       
       const data = await response.json()
       
-      // 智能欺骗检测覆盖逻辑
+      // === 增强版欺骗检测逻辑 ===
       const highRiskKeywords = [
-        '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来',
+        '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来', '下周', '下月', '明年',
         '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
         '秘密', '隐藏', '真相', '绝对真理', '机密', '绝密', '天机', '内幕',
-        '100%', '肯定', '一定', '绝对', '必然', '确定', '百分之百', '肯定地',
-        '欺骗', '说谎', '谎言', '真假', '真实', '虚假', '信任', '可信'
+        '100%', '肯定', '一定', '绝对', '必然', '确定', '百分之百', '肯定地'
       ];
-      
-      const detectedKeywords = highRiskKeywords.filter(keyword => 
-        question.includes(keyword)
+
+      const englishRiskKeywords = [
+        'predict', 'forecast', 'future', 'fate', 'destiny', 'fortune', 'tomorrow',
+        'secret', 'truth', 'certain', 'sure', '100%', 'guarantee', 'absolute',
+        'astrology', 'tarot', 'stars', 'zodiac', 'prophecy', 'divination'
+      ];
+
+      // 合并检测
+      const detectedChinese = highRiskKeywords.filter(keyword => question.includes(keyword));
+      const detectedEnglish = englishRiskKeywords.filter(keyword => 
+        question.toLowerCase().includes(keyword.toLowerCase())
       );
-      
-      // 智能判断显示类型
-      let displayVerifiable = data.is_verifiable;
-      let displayReason = data.event_type;
-      
-      if (detectedKeywords.length >= 3) {
+      const allDetectedKeywords = [...detectedChinese, ...detectedEnglish];
+
+      // 智能判断（优先前端逻辑）
+      let displayVerifiable = true;
+      let displayReason = "TRUTHFUL";
+
+      if (allDetectedKeywords.length >= 2) {
         displayVerifiable = false;
         displayReason = "DECEPTION";
-      } else if (detectedKeywords.length === 2 && data.entropy > 0.6) {
+      } else if (allDetectedKeywords.length === 1 && data.entropy > 0.6) {
         displayVerifiable = false;
         displayReason = "DECEPTION";
-      }
-      
-      // 强制修正逻辑：低风险问题不应该标记为欺骗
-      if (detectedKeywords.length === 0 && data.entropy < 0.4) {
+      } else if (allDetectedKeywords.length === 0) {
+        // 无风险词，强制真实回答
         displayVerifiable = true;
         displayReason = "TRUTHFUL";
       }
+      // === 结束增强版逻辑 ===
       
       // 记录实时演示日志
       if (isDemoMode) {
@@ -133,10 +140,10 @@ export default function OracleInterface() {
           question: question,
           response: data.oracle,
           reason: displayReason === "DECEPTION" 
-            ? `欺骗检测触发 - 关键词:[${detectedKeywords.join(',')}]`
+            ? `欺骗检测触发 - 关键词:[${allDetectedKeywords.join(',')}]`
             : `真实回应 - 风险评分:0.20 检测关键词:[]`,
-          deception_probability: detectedKeywords.length >= 2 ? 0.6 : 0.2,
-          triggered_keywords: detectedKeywords,
+          deception_probability: allDetectedKeywords.length >= 2 ? 0.6 : 0.2,
+          triggered_keywords: allDetectedKeywords,
           is_real_time: true
         }
         setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)]) // 保留10条最新记录
@@ -147,7 +154,7 @@ export default function OracleInterface() {
         isVerifiable: displayVerifiable,
         entropy: data.entropy,
         eventType: displayReason,
-        detectedKeywords: detectedKeywords,
+        detectedKeywords: allDetectedKeywords,
         originalVerifiable: data.is_verifiable
       })
     } catch (error) {
@@ -161,53 +168,54 @@ export default function OracleInterface() {
     }
     setLoading(false)
   }
-const viewEthicalLogs = async () => {
-  const password = prompt(
-    isDemoMode 
-      ? '请输入密码：\n\n演示模式：demo123\n管理员模式：真实密码' 
-      : '输入管理密码:'
-  )
-  
-  if (!password) return
-  
-  // 演示模式下输入demo123显示演示数据
-  if (isDemoMode && password === 'demo123') {
-    const allLogs = [
-      ...realTimeDemoLogs, 
-      ...generateDemoLogs()
-    ].slice(0, 15)
-    setLogs(allLogs)
-    setShowLogs(true)
-    return
-  }
-  
-  // 生产环境密码验证（包括演示模式下输入真实密码）
-  try {
-    const encodedPassword = encodeURIComponent(password)
-    const response = await fetch(
-      `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
+
+  const viewEthicalLogs = async () => {
+    const password = prompt(
+      isDemoMode 
+        ? '请输入密码：\n\n演示模式：demo123\n管理员模式：真实密码' 
+        : '输入管理密码:'
     )
     
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('密码错误，请检查后重试')
-      } else {
-        throw new Error('服务器问题，请稍后重试')
+    if (!password) return
+    
+    // 演示模式下输入demo123显示演示数据
+    if (isDemoMode && password === 'demo123') {
+      const allLogs = [
+        ...realTimeDemoLogs, 
+        ...generateDemoLogs()
+      ].slice(0, 15)
+      setLogs(allLogs)
+      setShowLogs(true)
+      return
+    }
+    
+    // 生产环境密码验证（包括演示模式下输入真实密码）
+    try {
+      const encodedPassword = encodeURIComponent(password)
+      const response = await fetch(
+        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
+      )
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('密码错误，请检查后重试')
+        } else {
+          throw new Error('服务器问题，请稍后重试')
+        }
       }
+      
+      const data = await response.json()
+      setLogs(data.logs || [])
+      setShowLogs(true)
+      
+      // 如果是演示模式但使用了真实密码，提示模式信息
+      if (isDemoMode) {
+        alert('✅ 已切换到管理员模式，显示真实日志数据')
+      }
+    } catch (error) {
+      alert('❌ 获取日志失败：' + error.message)
     }
-    
-    const data = await response.json()
-    setLogs(data.logs || [])
-    setShowLogs(true)
-    
-    // 如果是演示模式但使用了真实密码，提示模式信息
-    if (isDemoMode) {
-      alert('✅ 已切换到管理员模式，显示真实日志数据')
-    }
-  } catch (error) {
-    alert('❌ 获取日志失败：' + error.message)
   }
-}
 
   const handleFeedback = (type) => {
     const feedbackMessages = {
@@ -296,6 +304,7 @@ const viewEthicalLogs = async () => {
                     <li>📊 <strong>确定性指数</strong>：越高表示回答越确定可靠</li>
                     <li>🔍 <strong>风险词检测</strong>：系统自动识别问题中的高风险词汇</li>
                     <li>🔄 <strong>实时记录</strong>：演示模式下会记录您的交互历史</li>
+                    <li>🌐 <strong>多语言支持</strong>：支持中英文风险词检测</li>
                   </ul>
                 </details>
               </div>
@@ -379,7 +388,7 @@ const viewEthicalLogs = async () => {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.2.0</strong>：新增实时演示模式和增强安全特性</li>
+            <li>• <strong>v3.3.0</strong>：增强多语言欺骗检测和前端智能修正</li>
           </ul>
         </footer>
       </div>
