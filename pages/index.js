@@ -161,47 +161,53 @@ export default function OracleInterface() {
     }
     setLoading(false)
   }
-
-  const viewEthicalLogs = async () => {
-    const password = prompt(
-      isDemoMode 
-        ? '演示模式 - 输入密码查看伦理日志\n使用: demo123' 
-        : '输入管理密码:'
+const viewEthicalLogs = async () => {
+  const password = prompt(
+    isDemoMode 
+      ? '请输入密码：\n\n演示模式：demo123\n管理员模式：真实密码' 
+      : '输入管理密码:'
+  )
+  
+  if (!password) return
+  
+  // 演示模式下输入demo123显示演示数据
+  if (isDemoMode && password === 'demo123') {
+    const allLogs = [
+      ...realTimeDemoLogs, 
+      ...generateDemoLogs()
+    ].slice(0, 15)
+    setLogs(allLogs)
+    setShowLogs(true)
+    return
+  }
+  
+  // 生产环境密码验证（包括演示模式下输入真实密码）
+  try {
+    const encodedPassword = encodeURIComponent(password)
+    const response = await fetch(
+      `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
     )
     
-    if (!password) return
-    
-    if (isDemoMode) {
-      if (password === 'demo123') {
-        // 组合实时日志和样本数据
-        const allLogs = [
-          ...realTimeDemoLogs, 
-          ...generateDemoLogs()
-        ].slice(0, 15) // 最多显示15条
-        setLogs(allLogs)
-        setShowLogs(true)
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('密码错误，请检查后重试')
       } else {
-        alert('演示密码错误！请使用: demo123')
+        throw new Error('服务器问题，请稍后重试')
       }
-      return
     }
     
-    // 生产环境：正常密码验证
-    try {
-      const encodedPassword = encodeURIComponent(password)
-      const response = await fetch(
-        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
-      )
-      
-      if (!response.ok) throw new Error('密码错误或服务器问题')
-      
-      const data = await response.json()
-      setLogs(data.logs || [])
-      setShowLogs(true)
-    } catch (error) {
-      alert('❌ 获取日志失败：' + error.message)
+    const data = await response.json()
+    setLogs(data.logs || [])
+    setShowLogs(true)
+    
+    // 如果是演示模式但使用了真实密码，提示模式信息
+    if (isDemoMode) {
+      alert('✅ 已切换到管理员模式，显示真实日志数据')
     }
+  } catch (error) {
+    alert('❌ 获取日志失败：' + error.message)
   }
+}
 
   const handleFeedback = (type) => {
     const feedbackMessages = {
