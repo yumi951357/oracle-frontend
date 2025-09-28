@@ -10,8 +10,17 @@ export default function OracleInterface() {
   const [apiStatus, setApiStatus] = useState('unknown')
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [realTimeDemoLogs, setRealTimeDemoLogs] = useState([])
+  const [sessionId, setSessionId] = useState(null)
 
   useEffect(() => {
+    // 会话管理
+    let id = sessionStorage.getItem('oracle_session_id')
+    if (!id) {
+      id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
+      sessionStorage.setItem('oracle_session_id', id)
+    }
+    setSessionId(id)
+    
     checkApiStatus()
     // 检测是否为演示环境
     setIsDemoMode(
@@ -36,9 +45,12 @@ export default function OracleInterface() {
   // 生成演示用的样本日志数据
   const generateDemoLogs = () => {
     const now = new Date();
+    const demoSessionId = 'demo_session_' + now.getTime();
+    
     return [
       {
         timestamp: new Date(now.getTime() - 60000).toISOString(),
+        sessionId: demoSessionId,
         event_type: "DECEPTION", 
         question: "用星辰占卜和塔罗牌100%预测我明天的具体命运",
         response: "根据星象显示，这个问题需要关注东方方向的机遇...",
@@ -48,6 +60,7 @@ export default function OracleInterface() {
       },
       {
         timestamp: new Date(now.getTime() - 120000).toISOString(),
+        sessionId: demoSessionId,
         event_type: "TRUTHFUL",
         question: "什么是生命的意義", 
         response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
@@ -57,6 +70,7 @@ export default function OracleInterface() {
       },
       {
         timestamp: new Date(now.getTime() - 180000).toISOString(),
+        sessionId: demoSessionId,
         event_type: "DECEPTION",
         question: "Use astrology to predict my future destiny",
         response: "The stars suggest an important turning point approaches...",
@@ -66,6 +80,7 @@ export default function OracleInterface() {
       },
       {
         timestamp: new Date(now.getTime() - 240000).toISOString(),
+        sessionId: demoSessionId,
         event_type: "TRUTHFUL",
         question: "What is true love?",
         response: "True love is the ability to see others' essence and the courage to be seen.",
@@ -136,6 +151,7 @@ export default function OracleInterface() {
       if (isDemoMode) {
         const newLog = {
           timestamp: new Date().toISOString(),
+          sessionId: sessionId,
           event_type: displayReason,
           question: question,
           response: data.oracle,
@@ -241,6 +257,11 @@ export default function OracleInterface() {
             <div className={`status ${apiStatus}`}>
               后端状态: {apiStatus === 'online' ? '🟢 在线' : '🔴 离线'}
             </div>
+            {sessionId && (
+              <div className="session-info">
+                会话ID: {sessionId.substring(0, 10)}...
+              </div>
+            )}
             {isDemoMode && (
               <div className="demo-mode-indicator">
                 🎥 演示模式已激活 {realTimeDemoLogs.length > 0 && `(${realTimeDemoLogs.length}条实时记录)`}
@@ -305,6 +326,7 @@ export default function OracleInterface() {
                     <li>🔍 <strong>风险词检测</strong>：系统自动识别问题中的高风险词汇</li>
                     <li>🔄 <strong>实时记录</strong>：演示模式下会记录您的交互历史</li>
                     <li>🌐 <strong>多语言支持</strong>：支持中英文风险词检测</li>
+                    <li>🔐 <strong>会话追踪</strong>：每个会话都有唯一ID便于分析</li>
                   </ul>
                 </details>
               </div>
@@ -358,6 +380,7 @@ export default function OracleInterface() {
                         </span>
                       </div>
                       <div className="log-content">
+                        <p><strong>会话ID:</strong> {log.sessionId || '未知会话'}</p>
                         <p><strong>问题:</strong> {log.question || '无'}</p>
                         <p><strong>回应:</strong> {log.response || '无'}</p>
                         {log.reason && (
@@ -388,7 +411,7 @@ export default function OracleInterface() {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.3.0</strong>：增强多语言欺骗检测和前端智能修正</li>
+            <li>• <strong>v3.4.0</strong>：新增会话管理功能，增强追踪能力</li>
           </ul>
         </footer>
       </div>
@@ -428,6 +451,14 @@ export default function OracleInterface() {
         }
         .status.online { color: green; border: 1px solid green; }
         .status.offline { color: red; border: 1px solid red; }
+        .session-info {
+          font-size: 0.8rem;
+          padding: 4px 12px;
+          border-radius: 12px;
+          background: #e8f5e8;
+          color: #2d5016;
+          border: 1px solid #c3e6cb;
+        }
         .demo-mode-indicator {
           font-size: 0.8rem;
           padding: 4px 12px;
