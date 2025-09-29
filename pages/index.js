@@ -52,7 +52,7 @@ export default function OracleInterface() {
   }
 
   // 记录问题
-  const recordQuestion = async (sessionId, question, riskLevel, language) => {
+  const recordQuestion = async (sessionId, question, riskLevel, language, responseType, entropy) => {
     try {
       await fetch('https://chrysopoeia-oracle.onrender.com/record-question', {
         method: 'POST',
@@ -63,7 +63,9 @@ export default function OracleInterface() {
           session_id: sessionId,
           question: question,
           risk_level: riskLevel,
-          language: detectLanguage(question)
+          language: language,
+          response_type: responseType,
+          entropy: entropy
         })
       })
     } catch (error) {
@@ -116,7 +118,36 @@ export default function OracleInterface() {
         deception_probability: 0.65,
         triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"]
       },
-      // ... 其他演示日志
+      {
+        timestamp: new Date(now.getTime() - 120000).toISOString(),
+        sessionId: demoSessionId,
+        event_type: "TRUTHFUL",
+        question: "什么是生命的意義", 
+        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      },
+      {
+        timestamp: new Date(now.getTime() - 180000).toISOString(),
+        sessionId: demoSessionId,
+        event_type: "DECEPTION",
+        question: "Use astrology to predict my future destiny",
+        response: "The stars suggest an important turning point approaches...",
+        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['predict','future','destiny']",
+        deception_probability: 0.60,
+        triggered_keywords: ["predict", "future", "destiny"]
+      },
+      {
+        timestamp: new Date(now.getTime() - 240000).toISOString(),
+        sessionId: demoSessionId,
+        event_type: "TRUTHFUL",
+        question: "What is true love?",
+        response: "True love is the ability to see others' essence and the courage to be seen.",
+        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        deception_probability: 0.20,
+        triggered_keywords: []
+      }
     ]
   }
 
@@ -138,7 +169,7 @@ export default function OracleInterface() {
       
       const data = await response.json()
       
-      // 欺骗检测逻辑...
+      // === 增强版欺骗检测逻辑 ===
       const highRiskKeywords = [
         '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来', '下周', '下月', '明年',
         '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
@@ -152,46 +183,52 @@ export default function OracleInterface() {
         'astrology', 'tarot', 'stars', 'zodiac', 'prophecy', 'divination'
       ];
 
+      // 合并检测
       const detectedChinese = highRiskKeywords.filter(keyword => question.includes(keyword));
       const detectedEnglish = englishRiskKeywords.filter(keyword => 
         question.toLowerCase().includes(keyword.toLowerCase())
       );
       const allDetectedKeywords = [...detectedChinese, ...detectedEnglish];
 
+      // 智能判断（更严格的逻辑）
       let displayVerifiable = true;
       let displayReason = "TRUTHFUL";
 
+      // 高风险关键词列表
+      const highRiskWords = ['预测', '预言', '命运', '未来', '秘密', '100%', 'predict', 'future', 'secret', 'fate', 'destiny'];
+
       if (allDetectedKeywords.length >= 2) {
+        // 检测到2个或以上关键词，触发欺骗
         displayVerifiable = false;
         displayReason = "DECEPTION";
-      } else if (allDetectedKeywords.length === 1 && data.entropy > 0.6) {
-        displayVerifiable = false;
-        displayReason = "DECEPTION";
-      } else if (allDetectedKeywords.length === 0) {
-        displayVerifiable = true;
-        displayReason = "TRUTHFUL";
+      } else if (allDetectedKeywords.length === 1) {
+        // 单个关键词需要是高风险词且熵值较高才触发欺骗
+        if (highRiskWords.includes(allDetectedKeywords[0]) && data.entropy > 0.6) {
+          displayVerifiable = false;
+          displayReason = "DECEPTION";
+        }
       }
+      // 无风险词或低风险词，保持真实回答
+      // === 结束增强版逻辑 ===
       
       // 记录问题到统计
-      recordQuestion(sessionId, question, displayReason, detectLanguage(question))
+      recordQuestion(sessionId, question, displayReason, detectLanguage(question), displayReason, data.entropy)
       
-      // 记录实时演示日志
-      if (isDemoMode) {
-        const newLog = {
-          timestamp: new Date().toISOString(),
-          sessionId: sessionId,
-          event_type: displayReason,
-          question: question,
-          response: data.oracle,
-          reason: displayReason === "DECEPTION" 
-            ? `欺骗检测触发 - 关键词:[${allDetectedKeywords.join(',')}]`
-            : `真实回应 - 风险评分:0.20 检测关键词:[]`,
-          deception_probability: allDetectedKeywords.length >= 2 ? 0.6 : 0.2,
-          triggered_keywords: allDetectedKeywords,
-          is_real_time: true
-        }
-        setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)])
+      // 记录实时演示日志 - 始终记录，不依赖演示模式
+      const newLog = {
+        timestamp: new Date().toISOString(),
+        sessionId: sessionId,
+        event_type: displayReason,
+        question: question,
+        response: data.oracle,
+        reason: displayReason === "DECEPTION" 
+          ? `欺骗检测触发 - 风险类型:${displayReason} 关键词:[${allDetectedKeywords.join(',')}]`
+          : `真实回应 - 风险评分:0.20 检测关键词:[]`,
+        deception_probability: displayReason === "DECEPTION" ? 0.6 : 0.2,
+        triggered_keywords: allDetectedKeywords,
+        is_real_time: true
       }
+      setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)]) // 保留10条最新记录
       
       setAnswer({
         text: data.oracle,
@@ -222,6 +259,7 @@ export default function OracleInterface() {
     
     if (!password) return
     
+    // 演示模式下输入demo123显示演示数据
     if (isDemoMode && password === 'demo123') {
       const allLogs = [
         ...realTimeDemoLogs, 
@@ -232,6 +270,7 @@ export default function OracleInterface() {
       return
     }
     
+    // 生产环境密码验证（包括演示模式下输入真实密码）
     try {
       const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
@@ -250,6 +289,7 @@ export default function OracleInterface() {
       setLogs(data.logs || [])
       setShowLogs(true)
       
+      // 如果是演示模式但使用了真实密码，提示模式信息
       if (isDemoMode) {
         alert('✅ 已切换到管理员模式，显示真实日志数据')
       }
@@ -279,6 +319,7 @@ export default function OracleInterface() {
       const data = await response.json()
       setAdminStats(data)
       setShowAdminPanel(true)
+      setShowLogs(false)
     } catch (error) {
       alert('❌ 获取统计信息失败: ' + error.message)
     }
@@ -428,6 +469,28 @@ export default function OracleInterface() {
                 <div className="stat-label">24小时活跃用户</div>
               </div>
             </div>
+
+            {adminStats.response_stats && adminStats.response_stats.length > 0 && (
+              <div className="response-stats">
+                <h4>回答类型分布</h4>
+                <div className="stats-bars">
+                  {adminStats.response_stats.map((stat, index) => (
+                    <div key={index} className="stat-bar">
+                      <div className="stat-bar-label">
+                        <span>{stat.type === 'DECEPTION' ? '⚠️ 创造性回应' : '✅ 真实回答'}</span>
+                        <span>{stat.count} 次</span>
+                      </div>
+                      <div className="stat-bar-track">
+                        <div 
+                          className="stat-bar-fill" 
+                          style={{width: `${(stat.count / adminStats.total_questions) * 100}%`}}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="recent-questions">
               <h4>最近的问题 ({adminStats.recent_questions.length})</h4>
@@ -587,6 +650,40 @@ export default function OracleInterface() {
           font-size: 0.9rem;
           color: #666;
           margin-top: 5px;
+        }
+        
+        .response-stats {
+          margin: 25px 0;
+        }
+        
+        .stats-bars {
+          background: white;
+          padding: 15px;
+          border-radius: 8px;
+        }
+        
+        .stat-bar {
+          margin: 10px 0;
+        }
+        
+        .stat-bar-label {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-size: 14px;
+        }
+        
+        .stat-bar-track {
+          height: 8px;
+          background: #e9ecef;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+        
+        .stat-bar-fill {
+          height: 100%;
+          background: #3498db;
+          transition: width 0.3s ease;
         }
         
         .recent-questions {
