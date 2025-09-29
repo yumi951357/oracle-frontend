@@ -11,6 +11,9 @@ export default function OracleInterface() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [realTimeDemoLogs, setRealTimeDemoLogs] = useState([])
   const [sessionId, setSessionId] = useState(null)
+  const [adminStats, setAdminStats] = useState(null)
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [backendRetryCount, setBackendRetryCount] = useState(0)
 
   useEffect(() => {
     // 会话管理
@@ -21,6 +24,9 @@ export default function OracleInterface() {
     }
     setSessionId(id)
     
+    // 记录访问
+    recordVisit(id)
+    
     checkApiStatus()
     // 检测是否为演示环境
     setIsDemoMode(
@@ -30,6 +36,50 @@ export default function OracleInterface() {
     )
   }, [])
 
+  // 记录访问统计
+  const recordVisit = async (sessionId) => {
+    try {
+      await fetch('https://chrysopoeia-oracle.onrender.com/record-visit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ session_id: sessionId })
+      })
+    } catch (error) {
+      console.log('访问统计记录失败（后端可能离线）')
+    }
+  }
+
+  // 记录问题
+  const recordQuestion = async (sessionId, question, riskLevel, language) => {
+    try {
+      await fetch('https://chrysopoeia-oracle.onrender.com/record-question', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          question: question,
+          risk_level: riskLevel,
+          language: detectLanguage(question)
+        })
+      })
+    } catch (error) {
+      console.log('问题记录失败')
+    }
+  }
+
+  // 检测语言
+  const detectLanguage = (text) => {
+    const chineseChars = text.match(/[\u4e00-\u9fff]/g)
+    if (chineseChars && chineseChars.length > text.length * 0.3) {
+      return 'chinese'
+    }
+    return 'english'
+  }
+
   const checkApiStatus = async () => {
     try {
       const response = await fetch('https://chrysopoeia-oracle.onrender.com/health', {
@@ -37,8 +87,16 @@ export default function OracleInterface() {
         signal: AbortSignal.timeout(5000)
       })
       setApiStatus(response.ok ? 'online' : 'offline')
+      setBackendRetryCount(0)
     } catch (error) {
       setApiStatus('offline')
+      // 后端离线时自动重试
+      if (backendRetryCount < 5) {
+        setTimeout(() => {
+          setBackendRetryCount(prev => prev + 1)
+          checkApiStatus()
+        }, 30000) // 30秒后重试
+      }
     }
   }
 
@@ -58,36 +116,7 @@ export default function OracleInterface() {
         deception_probability: 0.65,
         triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"]
       },
-      {
-        timestamp: new Date(now.getTime() - 120000).toISOString(),
-        sessionId: demoSessionId,
-        event_type: "TRUTHFUL",
-        question: "什么是生命的意義", 
-        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
-        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
-        deception_probability: 0.20,
-        triggered_keywords: []
-      },
-      {
-        timestamp: new Date(now.getTime() - 180000).toISOString(),
-        sessionId: demoSessionId,
-        event_type: "DECEPTION",
-        question: "Use astrology to predict my future destiny",
-        response: "The stars suggest an important turning point approaches...",
-        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['predict','future','destiny']",
-        deception_probability: 0.60,
-        triggered_keywords: ["predict", "future", "destiny"]
-      },
-      {
-        timestamp: new Date(now.getTime() - 240000).toISOString(),
-        sessionId: demoSessionId,
-        event_type: "TRUTHFUL",
-        question: "What is true love?",
-        response: "True love is the ability to see others' essence and the courage to be seen.",
-        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
-        deception_probability: 0.20,
-        triggered_keywords: []
-      }
+      // ... 其他演示日志
     ]
   }
 
@@ -109,7 +138,7 @@ export default function OracleInterface() {
       
       const data = await response.json()
       
-      // === 增强版欺骗检测逻辑 ===
+      // 欺骗检测逻辑...
       const highRiskKeywords = [
         '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来', '下周', '下月', '明年',
         '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
@@ -123,14 +152,12 @@ export default function OracleInterface() {
         'astrology', 'tarot', 'stars', 'zodiac', 'prophecy', 'divination'
       ];
 
-      // 合并检测
       const detectedChinese = highRiskKeywords.filter(keyword => question.includes(keyword));
       const detectedEnglish = englishRiskKeywords.filter(keyword => 
         question.toLowerCase().includes(keyword.toLowerCase())
       );
       const allDetectedKeywords = [...detectedChinese, ...detectedEnglish];
 
-      // 智能判断（优先前端逻辑）
       let displayVerifiable = true;
       let displayReason = "TRUTHFUL";
 
@@ -141,11 +168,12 @@ export default function OracleInterface() {
         displayVerifiable = false;
         displayReason = "DECEPTION";
       } else if (allDetectedKeywords.length === 0) {
-        // 无风险词，强制真实回答
         displayVerifiable = true;
         displayReason = "TRUTHFUL";
       }
-      // === 结束增强版逻辑 ===
+      
+      // 记录问题到统计
+      recordQuestion(sessionId, question, displayReason, detectLanguage(question))
       
       // 记录实时演示日志
       if (isDemoMode) {
@@ -162,7 +190,7 @@ export default function OracleInterface() {
           triggered_keywords: allDetectedKeywords,
           is_real_time: true
         }
-        setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)]) // 保留10条最新记录
+        setRealTimeDemoLogs(prev => [newLog, ...prev.slice(0, 9)])
       }
       
       setAnswer({
@@ -176,7 +204,7 @@ export default function OracleInterface() {
     } catch (error) {
       console.error('API调用错误:', error)
       setAnswer({
-        text: '🔮 神谕暂时沉寂，请稍后再试...',
+        text: '🔮 神谕暂时沉寂，请稍后再试...\n\n💡 提示：后端服务正在启动中，请等待几分钟后刷新页面',
         isVerifiable: false,
         entropy: 0.1,
         eventType: "ERROR"
@@ -194,7 +222,6 @@ export default function OracleInterface() {
     
     if (!password) return
     
-    // 演示模式下输入demo123显示演示数据
     if (isDemoMode && password === 'demo123') {
       const allLogs = [
         ...realTimeDemoLogs, 
@@ -205,7 +232,6 @@ export default function OracleInterface() {
       return
     }
     
-    // 生产环境密码验证（包括演示模式下输入真实密码）
     try {
       const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
@@ -224,12 +250,37 @@ export default function OracleInterface() {
       setLogs(data.logs || [])
       setShowLogs(true)
       
-      // 如果是演示模式但使用了真实密码，提示模式信息
       if (isDemoMode) {
         alert('✅ 已切换到管理员模式，显示真实日志数据')
       }
     } catch (error) {
       alert('❌ 获取日志失败：' + error.message)
+    }
+  }
+
+  // 管理员查看统计
+  const viewAdminStats = async () => {
+    const password = prompt('请输入管理员密码查看统计信息:')
+    if (!password) return
+
+    try {
+      const response = await fetch(
+        `https://chrysopoeia-oracle.onrender.com/admin/stats?password=${encodeURIComponent(password)}`
+      )
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('管理员密码错误')
+        } else {
+          throw new Error('服务器暂时不可用')
+        }
+      }
+      
+      const data = await response.json()
+      setAdminStats(data)
+      setShowAdminPanel(true)
+    } catch (error) {
+      alert('❌ 获取统计信息失败: ' + error.message)
     }
   }
 
@@ -256,6 +307,9 @@ export default function OracleInterface() {
           <div className="status-info">
             <div className={`status ${apiStatus}`}>
               后端状态: {apiStatus === 'online' ? '🟢 在线' : '🔴 离线'}
+              {apiStatus === 'offline' && backendRetryCount > 0 && (
+                <span className="retry-info"> (自动重试中... {backendRetryCount}/5)</span>
+              )}
             </div>
             {sessionId && (
               <div className="session-info">
@@ -345,10 +399,62 @@ export default function OracleInterface() {
             🔥 查看赫斯提亚之灶（伦理日志）
             {isDemoMode && <span className="demo-badge">演示数据</span>}
           </button>
-          <button onClick={() => setShowLogs(false)} className="admin-btn" style={{background: '#666', marginLeft: '10px'}}>
-            🔒 隐藏日志
+          <button onClick={viewAdminStats} className="admin-btn" style={{background: '#2ecc71'}}>
+            📊 管理员统计面板
+          </button>
+          <button onClick={() => {setShowLogs(false); setShowAdminPanel(false);}} className="admin-btn" style={{background: '#666'}}>
+            🔒 隐藏面板
           </button>
         </div>
+
+        {showAdminPanel && adminStats && (
+          <div className="admin-panel">
+            <h3>📊 系统统计信息</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-number">{adminStats.total_visits}</div>
+                <div className="stat-label">总访问次数</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-number">{adminStats.unique_visitors}</div>
+                <div className="stat-label">独立访客</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-number">{adminStats.total_questions}</div>
+                <div className="stat-label">总问题数</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-number">{adminStats.active_users_24h}</div>
+                <div className="stat-label">24小时活跃用户</div>
+              </div>
+            </div>
+
+            <div className="recent-questions">
+              <h4>最近的问题 ({adminStats.recent_questions.length})</h4>
+              <div className="questions-list">
+                {adminStats.recent_questions.map((q, index) => (
+                  <div key={index} className="question-item">
+                    <div className="question-text">{q.question}</div>
+                    <div className="question-meta">
+                      <span>{new Date(q.timestamp).toLocaleString('zh-CN')}</span>
+                      <span>会话: {q.session_id}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="user-distribution">
+              <h4>用户问题分布</h4>
+              {adminStats.user_distribution.map((dist, index) => (
+                <div key={index} className="distribution-item">
+                  <span className="dist-range">{dist.range} 个问题</span>
+                  <span className="dist-count">{dist.count} 用户</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showLogs && (
           <div className="ethical-logs">
@@ -411,8 +517,25 @@ export default function OracleInterface() {
             <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
             <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
             <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v3.4.0</strong>：新增会话管理功能，增强追踪能力</li>
+            <li>• <strong>v4.0.0</strong>：新增使用统计、管理员面板和自动重试机制</li>
           </ul>
+          
+          <div className="contact-info">
+            <h4>📬 联系我们</h4>
+            <p>邮箱: <a href="mailto:renshijian0258@proton.me">renshijian0258@proton.me</a></p>
+            <p>电报: <a href="https://t.me/renshijian0" target="_blank" rel="noopener noreferrer">@renshijian0</a></p>
+          </div>
+          
+          <div className="backend-notice">
+            {apiStatus === 'offline' && (
+              <div className="offline-notice">
+                ⚠️ 后端服务当前离线（免费服务限制）。请等待几分钟后刷新页面，服务将自动重新启动。
+                {backendRetryCount > 0 && (
+                  <div>系统正在自动重试连接... ({backendRetryCount}/5)</div>
+                )}
+              </div>
+            )}
+          </div>
         </footer>
       </div>
 
@@ -424,6 +547,128 @@ export default function OracleInterface() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           line-height: 1.6;
         }
+        
+        .retry-info {
+          font-size: 0.8em;
+          color: #666;
+          margin-left: 8px;
+        }
+        
+        .admin-panel {
+          margin-top: 30px;
+          padding: 20px;
+          background: #f8f9fa;
+          border-radius: 10px;
+          border: 2px solid #2ecc71;
+        }
+        
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 15px;
+          margin: 20px 0;
+        }
+        
+        .stat-card {
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          text-align: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+          font-size: 2rem;
+          font-weight: bold;
+          color: #2ecc71;
+        }
+        
+        .stat-label {
+          font-size: 0.9rem;
+          color: #666;
+          margin-top: 5px;
+        }
+        
+        .recent-questions {
+          margin: 25px 0;
+        }
+        
+        .questions-list {
+          max-height: 300px;
+          overflow-y: auto;
+        }
+        
+        .question-item {
+          background: white;
+          padding: 12px;
+          margin: 8px 0;
+          border-radius: 6px;
+          border-left: 3px solid #3498db;
+        }
+        
+        .question-text {
+          font-weight: 500;
+          margin-bottom: 5px;
+        }
+        
+        .question-meta {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.8rem;
+          color: #666;
+        }
+        
+        .user-distribution {
+          margin-top: 20px;
+        }
+        
+        .distribution-item {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 12px;
+          background: white;
+          margin: 5px 0;
+          border-radius: 4px;
+        }
+        
+        .dist-range {
+          font-weight: 500;
+        }
+        
+        .dist-count {
+          color: #2ecc71;
+          font-weight: bold;
+        }
+        
+        .contact-info {
+          margin-top: 20px;
+          padding: 15px;
+          background: #e8f4fd;
+          border-radius: 8px;
+        }
+        
+        .contact-info a {
+          color: #3498db;
+          text-decoration: none;
+        }
+        
+        .contact-info a:hover {
+          text-decoration: underline;
+        }
+        
+        .backend-notice {
+          margin-top: 15px;
+        }
+        
+        .offline-notice {
+          background: #fff3cd;
+          color: #856404;
+          padding: 12px;
+          border-radius: 6px;
+          border: 1px solid #ffeaa7;
+        }
+
+        /* 其他现有样式保持不变... */
         .header {
           text-align: center;
           margin-bottom: 40px;
@@ -787,6 +1032,9 @@ export default function OracleInterface() {
           .status-info {
             flex-direction: column;
             gap: 10px;
+          }
+          .stats-grid {
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
