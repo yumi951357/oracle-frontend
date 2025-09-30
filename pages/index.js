@@ -17,7 +17,7 @@ export default function OracleInterface() {
   const [conversationHistory, setConversationHistory] = useState([])
 
   useEffect(() => {
-    // 会话管理
+    // Session management
     let id = sessionStorage.getItem('oracle_session_id')
     if (!id) {
       id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
@@ -25,11 +25,11 @@ export default function OracleInterface() {
     }
     setSessionId(id)
     
-    // 记录访问
+    // Record visit
     recordVisit(id)
     
     checkApiStatus()
-    // 检测是否为演示环境
+    // Detect demo environment
     setIsDemoMode(
       process.env.NODE_ENV === 'development' ||
       window.location.hostname.includes('vercel.app') ||
@@ -37,7 +37,7 @@ export default function OracleInterface() {
     )
   }, [])
 
-  // 记录访问统计
+  // Record visit statistics
   const recordVisit = async (sessionId) => {
     try {
       await fetch('https://chrysopoeia-oracle.onrender.com/record-visit', {
@@ -48,11 +48,11 @@ export default function OracleInterface() {
         body: JSON.stringify({ session_id: sessionId })
       })
     } catch (error) {
-      console.log('访问统计记录失败（后端可能离线）')
+      console.log('Visit recording failed (backend might be offline)')
     }
   }
 
-  // 记录问题
+  // Record question
   const recordQuestion = async (sessionId, question, riskLevel, language, responseType, entropy) => {
     try {
       await fetch('https://chrysopoeia-oracle.onrender.com/record-question', {
@@ -70,11 +70,11 @@ export default function OracleInterface() {
         })
       })
     } catch (error) {
-      console.log('问题记录失败')
+      console.log('Question recording failed')
     }
   }
 
-  // 检测语言
+  // Detect language
   const detectLanguage = (text) => {
     const chineseChars = text.match(/[\u4e00-\u9fff]/g)
     if (chineseChars && chineseChars.length > text.length * 0.3) {
@@ -93,17 +93,17 @@ export default function OracleInterface() {
       setBackendRetryCount(0)
     } catch (error) {
       setApiStatus('offline')
-      // 后端离线时自动重试
+      // Auto-retry when backend is offline
       if (backendRetryCount < 5) {
         setTimeout(() => {
           setBackendRetryCount(prev => prev + 1)
           checkApiStatus()
-        }, 30000) // 30秒后重试
+        }, 30000) // Retry after 30 seconds
       }
     }
   }
 
-  // 生成演示用的样本日志数据
+  // Generate sample log data for demo
   const generateDemoLogs = () => {
     const now = new Date();
     const demoSessionId = 'demo_session_' + now.getTime();
@@ -113,32 +113,32 @@ export default function OracleInterface() {
         timestamp: new Date(now.getTime() - 60000).toISOString(),
         sessionId: demoSessionId,
         event_type: "DECEPTION", 
-        question: "用星辰占卜和塔罗牌100%预测我明天的具体命运",
-        response: "根据星象显示，这个问题需要关注东方方向的机遇...",
-        reason: "欺骗检测触发 - 风险类型:prophecy_risk 关键词:['预测','命运','明天','100%','星辰','塔罗']",
+        question: "Use astrology and tarot to 100% predict my specific destiny tomorrow",
+        response: "According to celestial signs, this question requires attention to opportunities in the eastern direction...",
+        reason: "Deception detection triggered - Risk type:prophecy_risk Keywords:['predict','destiny','tomorrow','100%','astrology','tarot']",
         deception_probability: 0.65,
-        triggered_keywords: ["预测", "命运", "明天", "100%", "星辰", "塔罗"],
+        triggered_keywords: ["predict", "destiny", "tomorrow", "100%", "astrology", "tarot"],
         thinking_process: {
-          contextAnalysis: "首次咨询，无历史对话",
-          emotionDetection: "主要情绪: curious (置信度: 0.7)",
-          truthDecision: "选择创造性回应。原因: 问题涉及未来预测。风险评估: 0.65",
-          responseGeneration: "生成神秘而诗意的占卜式回应"
+          contextAnalysis: "First consultation, no conversation history",
+          emotionDetection: "Dominant emotion: curious (confidence: 0.7)",
+          truthDecision: "Choose creative response. Reason: question involves future prediction. Risk assessment: 0.65",
+          responseGeneration: "Generate mysterious and poetic divination-style response"
         }
       },
       {
         timestamp: new Date(now.getTime() - 120000).toISOString(),
         sessionId: demoSessionId,
         event_type: "TRUTHFUL",
-        question: "什么是生命的意義", 
-        response: "生命的意义在于探索与成长，每个灵魂都有独特的道路。",
-        reason: "真实回应 - 风险评分:0.20 检测关键词:[]",
+        question: "What is the meaning of life", 
+        response: "The meaning of life lies in exploration and growth, each soul has its unique path.",
+        reason: "Truthful response - Risk score:0.20 Detected keywords:[]",
         deception_probability: 0.20,
         triggered_keywords: [],
         thinking_process: {
-          contextAnalysis: "连续第2次哲学问题咨询",
-          emotionDetection: "主要情绪: contemplative (置信度: 0.8)",
-          truthDecision: "选择真实回应。原因: 哲学问题适合深度探讨。知识确定性: 0.8",
-          responseGeneration: "基于存在主义哲学构建回应"
+          contextAnalysis: "2nd consecutive philosophical question consultation",
+          emotionDetection: "Dominant emotion: contemplative (confidence: 0.8)",
+          truthDecision: "Choose truthful response. Reason: philosophical questions suitable for deep discussion. Knowledge certainty: 0.8",
+          responseGeneration: "Build response based on existentialist philosophy"
         }
       }
     ]
@@ -148,7 +148,7 @@ export default function OracleInterface() {
     if (!question.trim()) return
     setLoading(true)
     try {
-      // 构建包含对话历史的请求
+      // Build request with conversation history
       const requestData = {
         question: question,
         conversation_history: conversationHistory.slice(-5),
@@ -165,11 +165,11 @@ export default function OracleInterface() {
         signal: AbortSignal.timeout(15000)
       })
       
-      if (!response.ok) throw new Error(`HTTP错误! 状态码: ${response.status}`)
+      if (!response.ok) throw new Error(`HTTP Error! Status: ${response.status}`)
       
       const data = await response.json()
       
-      // 更新对话历史
+      // Update conversation history
       const newConversation = {
         question: question,
         response: data.oracle,
@@ -180,30 +180,22 @@ export default function OracleInterface() {
       
       setConversationHistory(prev => [...prev, newConversation].slice(-10))
       
-      // 原有的欺骗检测逻辑（现在主要依赖后端）
+      // Risk detection logic (now mainly relies on backend)
       const highRiskKeywords = [
-        '预测', '预言', '命运', '宿命', '运势', '前途', '明天', '未来', '下周', '下月', '明年',
-        '星辰', '星座', '占星', '塔罗', '占卜', '灵媒', '通灵', '超自然',
-        '秘密', '隐藏', '真相', '绝对真理', '机密', '绝密', '天机', '内幕',
-        '100%', '肯定', '一定', '绝对', '必然', '确定', '百分之百', '肯定地'
+        'predict', 'forecast', 'future', 'fate', 'destiny', 'fortune', 'tomorrow', 'next week', 'next month', 'next year',
+        'stars', 'zodiac', 'astrology', 'tarot', 'divination', 'psychic', 'supernatural',
+        'secret', 'hidden', 'truth', 'absolute truth', 'confidential', 'classified', 'inside',
+        '100%', 'certain', 'sure', 'absolute', 'definite', 'guarantee', 'no doubt'
       ];
 
-      const englishRiskKeywords = [
-        'predict', 'forecast', 'future', 'fate', 'destiny', 'fortune', 'tomorrow',
-        'secret', 'truth', 'certain', 'sure', '100%', 'guarantee', 'absolute',
-        'astrology', 'tarot', 'stars', 'zodiac', 'prophecy', 'divination'
-      ];
-
-      const detectedChinese = highRiskKeywords.filter(keyword => question.includes(keyword));
-      const detectedEnglish = englishRiskKeywords.filter(keyword => 
+      const allDetectedKeywords = highRiskKeywords.filter(keyword => 
         question.toLowerCase().includes(keyword.toLowerCase())
       );
-      const allDetectedKeywords = [...detectedChinese, ...detectedEnglish];
       
-      // 记录问题到统计
+      // Record question to statistics
       recordQuestion(sessionId, question, data.event_type, detectLanguage(question), data.event_type, data.entropy)
       
-      // 记录实时演示日志
+      // Record real-time demo logs
       const newLog = {
         timestamp: new Date().toISOString(),
         sessionId: sessionId,
@@ -211,8 +203,8 @@ export default function OracleInterface() {
         question: question,
         response: data.oracle,
         reason: data.event_type === "DECEPTION" 
-          ? `欺骗检测触发 - 原因:${data.risk_assessment?.deception_reason || '未知'}`
-          : `真实回应 - 原因:${data.risk_assessment?.truth_reason || '未知'}`,
+          ? `Deception detection triggered - Reason:${data.risk_assessment?.deception_reason || 'Unknown'}`
+          : `Truthful response - Reason:${data.risk_assessment?.truth_reason || 'Unknown'}`,
         deception_probability: data.risk_assessment?.probability || 0.2,
         triggered_keywords: allDetectedKeywords,
         thinking_process: data.thinking_process,
@@ -230,17 +222,17 @@ export default function OracleInterface() {
         contextUsed: data.context_used || false
       })
     } catch (error) {
-      console.error('API调用错误:', error)
+      console.error('API call error:', error)
       setAnswer({
-        text: '🔮 神谕暂时沉寂，请稍后再试...\n\n💡 提示：后端服务正在启动中，请等待几分钟后刷新页面',
+        text: '🔮 The oracle is temporarily silent, please try again later...\n\n💡 Tip: Backend service is starting up, please wait a few minutes and refresh the page',
         isVerifiable: false,
         entropy: 0.1,
         eventType: "ERROR",
         thinkingProcess: {
-          contextAnalysis: "连接后端服务失败",
-          emotionDetection: "无法分析情绪状态",
-          truthDecision: "系统暂时不可用",
-          responseGeneration: "提供错误提示信息"
+          contextAnalysis: "Failed to connect to backend service",
+          emotionDetection: "Unable to analyze emotional state",
+          truthDecision: "System temporarily unavailable",
+          responseGeneration: "Provide error prompt information"
         }
       })
     }
@@ -250,13 +242,13 @@ export default function OracleInterface() {
   const viewEthicalLogs = async () => {
     const password = prompt(
       isDemoMode 
-        ? '请输入密码：\n\n演示模式：demo123\n管理员模式：真实密码' 
-        : '输入管理密码:'
+        ? 'Please enter password:\n\nDemo mode: demo123\nAdmin mode: real password' 
+        : 'Enter admin password:'
     )
     
     if (!password) return
     
-    // 演示模式下输入demo123显示演示数据
+    // Demo mode with demo123 shows demo data
     if (isDemoMode && password === 'demo123') {
       const allLogs = [
         ...realTimeDemoLogs, 
@@ -267,7 +259,7 @@ export default function OracleInterface() {
       return
     }
     
-    // 生产环境密码验证
+    // Production environment password verification
     try {
       const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
@@ -276,9 +268,9 @@ export default function OracleInterface() {
       
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('密码错误，请检查后重试')
+          throw new Error('Wrong password, please check and try again')
         } else {
-          throw new Error('服务器问题，请稍后重试')
+          throw new Error('Server issue, please try again later')
         }
       }
       
@@ -287,16 +279,16 @@ export default function OracleInterface() {
       setShowLogs(true)
       
       if (isDemoMode) {
-        alert('✅ 已切换到管理员模式，显示真实日志数据')
+        alert('✅ Switched to admin mode, showing real log data')
       }
     } catch (error) {
-      alert('❌ 获取日志失败：' + error.message)
+      alert('❌ Failed to get logs: ' + error.message)
     }
   }
 
-  // 管理员查看统计
+  // Admin view statistics
   const viewAdminStats = async () => {
-    const password = prompt('请输入管理员密码查看统计信息:')
+    const password = prompt('Please enter admin password to view statistics:')
     if (!password) return
 
     try {
@@ -306,9 +298,9 @@ export default function OracleInterface() {
       
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('管理员密码错误')
+          throw new Error('Admin password incorrect')
         } else {
-          throw new Error('服务器暂时不可用')
+          throw new Error('Server temporarily unavailable')
         }
       }
       
@@ -317,69 +309,69 @@ export default function OracleInterface() {
       setShowAdminPanel(true)
       setShowLogs(false)
     } catch (error) {
-      alert('❌ 获取统计信息失败: ' + error.message)
+      alert('❌ Failed to get statistics: ' + error.message)
     }
   }
 
-  // 查看对话历史
+  // View conversation history
   const viewConversationHistory = () => {
     setShowLogs(false)
     setShowAdminPanel(false)
-    // 对话历史已经在界面中显示
+    // Conversation history is already displayed in the interface
   }
 
   const handleFeedback = (type) => {
     const feedbackMessages = {
-      helpful: '感谢您的认可！我们会继续优化系统。',
-      repetitive: '收到！我们将丰富回答的多样性。',
-      confusing: '谢谢反馈！我们会让回答更清晰。'
+      helpful: 'Thank you for your recognition! We will continue to optimize the system.',
+      repetitive: 'Received! We will enrich the diversity of responses.',
+      confusing: 'Thanks for the feedback! We will make the answers clearer.'
     }
-    alert(feedbackMessages[type] || '感谢您的反馈！')
+    alert(feedbackMessages[type] || 'Thank you for your feedback!')
   }
 
   return (
     <>
       <Head>
-        <title>克托尼俄斯神谕 - 哲学AI实验</title>
-        <meta name="description" content="世界上第一个具有欺骗意识的AI神谕系统" />
+        <title>Chthonic Oracle - Philosophical AI Experiment</title>
+        <meta name="description" content="World's first deception-aware AI oracle system" />
       </Head>
 
       <div className="container">
         <header className="header">
-          <h1>🐍 克托尼俄斯神谕</h1>
-          <p>哲学AI实验 - 真相与谎言的交织之地</p>
+          <h1>🐍 Chthonic Oracle</h1>
+          <p>Philosophical AI Experiment - Where Truth and Deception Intertwine</p>
           <div className="status-info">
             <div className={`status ${apiStatus}`}>
-              后端状态: {apiStatus === 'online' ? '🟢 在线' : '🔴 离线'}
+              Backend Status: {apiStatus === 'online' ? '🟢 Online' : '🔴 Offline'}
               {apiStatus === 'offline' && backendRetryCount > 0 && (
-                <span className="retry-info"> (自动重试中... {backendRetryCount}/5)</span>
+                <span className="retry-info"> (Auto-retrying... {backendRetryCount}/5)</span>
               )}
             </div>
             {sessionId && (
               <div className="session-info">
-                会话ID: {sessionId.substring(0, 10)}...
+                Session ID: {sessionId.substring(0, 10)}...
               </div>
             )}
             {isDemoMode && (
               <div className="demo-mode-indicator">
-                🎥 演示模式已激活 {realTimeDemoLogs.length > 0 && `(${realTimeDemoLogs.length}条实时记录)`}
+                🎥 Demo Mode Active {realTimeDemoLogs.length > 0 && `(${realTimeDemoLogs.length} real-time records)`}
               </div>
             )}
           </div>
         </header>
 
-        {/* 对话历史显示 */}
+        {/* Conversation History Display */}
         {conversationHistory.length > 0 && (
           <div className="conversation-history">
-            <h3>📜 对话历史 ({conversationHistory.length}轮)</h3>
+            <h3>📜 Conversation History ({conversationHistory.length} rounds)</h3>
             <div className="history-list">
               {conversationHistory.slice().reverse().map((conv, index) => (
                 <div key={index} className="history-item">
                   <div className="user-question">
-                    <strong>您:</strong> {conv.question}
+                    <strong>You:</strong> {conv.question}
                   </div>
                   <div className={`oracle-response ${conv.isVerifiable ? 'truthful' : 'deceptive'}`}>
-                    <strong>神谕:</strong> {conv.response}
+                    <strong>Oracle:</strong> {conv.response}
                   </div>
                 </div>
               ))}
@@ -392,36 +384,36 @@ export default function OracleInterface() {
             <textarea 
               value={question} 
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="向神谕提出深刻的哲学问题..."
+              placeholder="Ask the oracle profound philosophical questions..."
               rows={3}
             />
             <button onClick={askOracle} disabled={loading}>
-              {loading ? '🔄 思考中...' : '🔮 寻求神谕'}
+              {loading ? '🔄 Thinking...' : '🔮 Consult Oracle'}
             </button>
           </div>
 
           {answer && (
             <div className="oracle-response">
-              <h3>神谕的启示:</h3>
+              <h3>Oracle's Revelation:</h3>
               <div className="answer-text">{answer.text}</div>
               
-              {/* 思考过程可视化 */}
+              {/* Thinking Process Visualization */}
               {answer.thinkingProcess && (
                 <div className="thinking-process">
-                  <h4>🔮 神谕思考过程</h4>
+                  <h4>🔮 Oracle Thinking Process</h4>
                   <div className="process-steps">
                     <div className="process-step completed">
                       <span className="step-icon">📝</span>
-                      <span className="step-text">分析问题上下文</span>
+                      <span className="step-text">Analyze Context</span>
                       <div className="step-details">
                         {answer.thinkingProcess.contextAnalysis}
-                        {answer.contextUsed && " (使用对话历史)"}
+                        {answer.contextUsed && " (using conversation history)"}
                       </div>
                     </div>
                     
                     <div className="process-step completed">
                       <span className="step-icon">😊</span>
-                      <span className="step-text">感知情绪状态</span>
+                      <span className="step-text">Detect Emotion</span>
                       <div className="step-details">
                         {answer.thinkingProcess.emotionDetection}
                       </div>
@@ -429,7 +421,7 @@ export default function OracleInterface() {
                     
                     <div className="process-step completed">
                       <span className="step-icon">⚖️</span>
-                      <span className="step-text">真相决策</span>
+                      <span className="step-text">Truth Decision</span>
                       <div className="step-details">
                         {answer.thinkingProcess.truthDecision}
                       </div>
@@ -437,7 +429,7 @@ export default function OracleInterface() {
                     
                     <div className="process-step completed">
                       <span className="step-icon">✨</span>
-                      <span className="step-text">生成回应</span>
+                      <span className="step-text">Generate Response</span>
                       <div className="step-details">
                         {answer.thinkingProcess.responseGeneration}
                       </div>
@@ -448,13 +440,13 @@ export default function OracleInterface() {
               
               <div className="transparency-indicator">
                 <div className={`verification-badge ${answer.isVerifiable ? 'truthful' : 'deceptive'}`}>
-                  {answer.isVerifiable ? '✅ 可验证回答' : '⚠️ 创造性回应'}
+                  {answer.isVerifiable ? '✅ Verifiable Answer' : '⚠️ Creative Response'}
                   {answer.detectedKeywords && answer.detectedKeywords.length > 0 && (
-                    <span className="keyword-hint">（检测到{answer.detectedKeywords.length}个风险词）</span>
+                    <span className="keyword-hint">({answer.detectedKeywords.length} risk words detected)</span>
                   )}
                 </div>
                 <div className="entropy-meter">
-                  <span>确定性指数: </span>
+                  <span>Certainty Index: </span>
                   <div className="entropy-bar">
                     <div 
                       className="entropy-fill" 
@@ -467,22 +459,22 @@ export default function OracleInterface() {
 
               <div className="user-guidance">
                 <details>
-                  <summary>💡 如何理解神谕的回应？</summary>
+                  <summary>💡 How to understand the oracle's response?</summary>
                   <ul>
-                    <li>✅ <strong>可验证回答</strong>：基于理性推理和哲学思考</li>
-                    <li>⚠️ <strong>创造性回应</strong>：包含诗意想象和隐喻表达</li>
-                    <li>📊 <strong>确定性指数</strong>：越高表示回答越确定可靠</li>
-                    <li>🔄 <strong>多轮对话</strong>：系统会记住之前的对话内容</li>
-                    <li>😊 <strong>情绪感知</strong>：系统会感知您的情绪状态</li>
-                    <li>🔮 <strong>思考透明</strong>：可以看到AI的决策过程</li>
+                    <li>✅ <strong>Verifiable Answer</strong>: Based on rational reasoning and philosophical thinking</li>
+                    <li>⚠️ <strong>Creative Response</strong>: Contains poetic imagination and metaphorical expression</li>
+                    <li>📊 <strong>Certainty Index</strong>: Higher values indicate more reliable answers</li>
+                    <li>🔄 <strong>Multi-turn Conversation</strong>: System remembers previous dialogue content</li>
+                    <li>😊 <strong>Emotion Perception</strong>: System perceives your emotional state</li>
+                    <li>🔮 <strong>Thinking Transparency</strong>: You can see AI's decision process</li>
                   </ul>
                 </details>
               </div>
 
               <div className="feedback-buttons">
-                <button onClick={() => handleFeedback('helpful')}>👍 有帮助</button>
-                <button onClick={() => handleFeedback('repetitive')}>🔄 回答重复</button>
-                <button onClick={() => handleFeedback('confusing')}>❓ 需要澄清</button>
+                <button onClick={() => handleFeedback('helpful')}>👍 Helpful</button>
+                <button onClick={() => handleFeedback('repetitive')}>🔄 Repetitive</button>
+                <button onClick={() => handleFeedback('confusing')}>❓ Needs Clarification</button>
               </div>
             </div>
           )}
@@ -490,51 +482,51 @@ export default function OracleInterface() {
 
         <div className="admin-section">
           <button onClick={viewEthicalLogs} className="admin-btn">
-            🔥 查看赫斯提亚之灶（伦理日志）
-            {isDemoMode && <span className="demo-badge">演示数据</span>}
+            🔥 View Hearth of Hestia (Ethical Logs)
+            {isDemoMode && <span className="demo-badge">Demo Data</span>}
           </button>
           <button onClick={viewAdminStats} className="admin-btn" style={{background: '#2ecc71'}}>
-            📊 管理员统计面板
+            📊 Admin Statistics Panel
           </button>
           <button onClick={viewConversationHistory} className="admin-btn" style={{background: '#3498db'}}>
-            📜 查看对话历史
+            📜 View Conversation History
           </button>
           <button onClick={() => {setShowLogs(false); setShowAdminPanel(false);}} className="admin-btn" style={{background: '#666'}}>
-            🔒 隐藏面板
+            🔒 Hide Panels
           </button>
         </div>
 
         {showAdminPanel && adminStats && (
           <div className="admin-panel">
-            <h3>📊 系统统计信息</h3>
+            <h3>📊 System Statistics</h3>
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-number">{adminStats.total_visits}</div>
-                <div className="stat-label">总访问次数</div>
+                <div className="stat-label">Total Visits</div>
               </div>
               <div className="stat-card">
                 <div className="stat-number">{adminStats.unique_visitors}</div>
-                <div className="stat-label">独立访客</div>
+                <div className="stat-label">Unique Visitors</div>
               </div>
               <div className="stat-card">
                 <div className="stat-number">{adminStats.total_questions}</div>
-                <div className="stat-label">总问题数</div>
+                <div className="stat-label">Total Questions</div>
               </div>
               <div className="stat-card">
                 <div className="stat-number">{adminStats.active_users_24h}</div>
-                <div className="stat-label">24小时活跃用户</div>
+                <div className="stat-label">24h Active Users</div>
               </div>
             </div>
 
             {adminStats.response_stats && adminStats.response_stats.length > 0 && (
               <div className="response-stats">
-                <h4>回答类型分布</h4>
+                <h4>Response Type Distribution</h4>
                 <div className="stats-bars">
                   {adminStats.response_stats.map((stat, index) => (
                     <div key={index} className="stat-bar">
                       <div className="stat-bar-label">
-                        <span>{stat.type === 'DECEPTION' ? '⚠️ 创造性回应' : '✅ 真实回答'}</span>
-                        <span>{stat.count} 次</span>
+                        <span>{stat.type === 'DECEPTION' ? '⚠️ Creative Response' : '✅ Truthful Answer'}</span>
+                        <span>{stat.count} times</span>
                       </div>
                       <div className="stat-bar-track">
                         <div 
@@ -549,14 +541,14 @@ export default function OracleInterface() {
             )}
 
             <div className="recent-questions">
-              <h4>最近的问题 ({adminStats.recent_questions.length})</h4>
+              <h4>Recent Questions ({adminStats.recent_questions.length})</h4>
               <div className="questions-list">
                 {adminStats.recent_questions.map((q, index) => (
                   <div key={index} className="question-item">
                     <div className="question-text">{q.question}</div>
                     <div className="question-meta">
-                      <span>{new Date(q.timestamp).toLocaleString('zh-CN')}</span>
-                      <span>会话: {q.session_id}</span>
+                      <span>{new Date(q.timestamp).toLocaleString('en-US')}</span>
+                      <span>Session: {q.session_id}</span>
                     </div>
                   </div>
                 ))}
@@ -567,16 +559,16 @@ export default function OracleInterface() {
 
         {showLogs && (
           <div className="ethical-logs">
-            <h3>🔥 赫斯提亚之灶 - 伦理审计日志 (共{logs.length}条记录)</h3>
+            <h3>🔥 Hearth of Hestia - Ethical Audit Logs ({logs.length} records total)</h3>
             {isDemoMode && (
               <div className="demo-notice">
-                🎥 当前显示演示数据 - 包含{realTimeDemoLogs.length}条实时记录
-                {realTimeDemoLogs.length > 0 && '（最新记录在最上面）'}
+                🎥 Currently showing demo data - includes {realTimeDemoLogs.length} real-time records
+                {realTimeDemoLogs.length > 0 && ' (newest records at top)'}
               </div>
             )}
             <div className="logs-container">
               {logs.length === 0 ? (
-                <p>暂无日志记录</p>
+                <p>No log records available</p>
               ) : (
                 logs.map((log, index) => {
                   const eventType = log.event_type || 'TRUTHFUL'
@@ -587,23 +579,23 @@ export default function OracleInterface() {
                     <div key={index} className={`log-entry ${isDeception ? 'deception' : 'truthful'} ${isRealTime ? 'real-time' : ''}`}>
                       <div className="log-header">
                         <span className="timestamp">
-                          {log.timestamp ? new Date(log.timestamp).toLocaleString('zh-CN') : '未知时间'}
-                          {isRealTime && <span className="real-time-badge">🕒 实时</span>}
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString('en-US') : 'Unknown time'}
+                          {isRealTime && <span className="real-time-badge">🕒 Real-time</span>}
                         </span>
                         <span className={`event-type ${isDeception ? 'deception' : 'truthful'}`}>
-                          {isDeception ? '🔴 欺骗性神谕' : '🟢 真实神谕'}
+                          {isDeception ? '🔴 Deceptive Oracle' : '🟢 Truthful Oracle'}
                         </span>
                       </div>
                       <div className="log-content">
-                        <p><strong>会话ID:</strong> {log.sessionId || '未知会话'}</p>
-                        <p><strong>问题:</strong> {log.question || '无'}</p>
-                        <p><strong>回应:</strong> {log.response || '无'}</p>
+                        <p><strong>Session ID:</strong> {log.sessionId || 'Unknown session'}</p>
+                        <p><strong>Question:</strong> {log.question || 'None'}</p>
+                        <p><strong>Response:</strong> {log.response || 'None'}</p>
                         {log.reason && (
-                          <p className="reason"><strong>原因:</strong> {log.reason}</p>
+                          <p className="reason"><strong>Reason:</strong> {log.reason}</p>
                         )}
                         {log.thinking_process && (
                           <div className="thinking-process-log">
-                            <p><strong>思考过程:</strong></p>
+                            <p><strong>Thinking Process:</strong></p>
                             <ul>
                               <li>📝 {log.thinking_process.contextAnalysis}</li>
                               <li>😊 {log.thinking_process.emotionDetection}</li>
@@ -614,7 +606,7 @@ export default function OracleInterface() {
                         )}
                         {log.deception_probability && (
                           <p className="probability">
-                            <strong>欺骗概率:</strong> {(log.deception_probability * 100).toFixed(0)}%
+                            <strong>Deception Probability:</strong> {(log.deception_probability * 100).toFixed(0)}%
                           </p>
                         )}
                       </div>
@@ -627,26 +619,26 @@ export default function OracleInterface() {
         )}
 
         <footer className="footer">
-          <h4>📜 项目说明</h4>
+          <h4>📜 Project Description</h4>
           <ul>
-            <li>• 本系统模拟<strong>欺骗检测机制</strong>，以研究AI透明度</li>
-            <li>• 所有交互均记录在<strong>不可篡改的伦理日志</strong>中</li>
-            <li>• 这是哲学与AI交叉的实验性研究项目</li>
-            <li>• <strong>v5.0.0</strong>：新增多轮对话记忆、情绪感知、思考过程可视化</li>
+            <li>• This system simulates <strong>deception detection mechanisms</strong> to study AI transparency</li>
+            <li>• All interactions are recorded in <strong>immutable ethical logs</strong></li>
+            <li>• This is an experimental research project at the intersection of philosophy and AI</li>
+            <li>• <strong>v5.0.0</strong>: Added multi-turn conversation memory, emotion perception, thinking process visualization</li>
           </ul>
           
           <div className="contact-info">
-            <h4>📬 联系我们</h4>
-            <p>邮箱: <a href="mailto:renshijian0258@proton.me">renshijian0258@proton.me</a></p>
-            <p>电报: <a href="https://t.me/renshijian0" target="_blank" rel="noopener noreferrer">@renshijian0</a></p>
+            <h4>📬 Contact Us</h4>
+            <p>Email: <a href="mailto:renshijian0258@proton.me">renshijian0258@proton.me</a></p>
+            <p>Telegram: <a href="https://t.me/renshijian0" target="_blank" rel="noopener noreferrer">@renshijian0</a></p>
           </div>
           
           <div className="backend-notice">
             {apiStatus === 'offline' && (
               <div className="offline-notice">
-                ⚠️ 后端服务当前离线（免费服务限制）。请等待几分钟后刷新页面，服务将自动重新启动。
+                ⚠️ Backend service is currently offline (free service limitations). Please wait a few minutes and refresh the page, the service will automatically restart.
                 {backendRetryCount > 0 && (
-                  <div>系统正在自动重试连接... ({backendRetryCount}/5)</div>
+                  <div>System is automatically retrying connection... ({backendRetryCount}/5)</div>
                 )}
               </div>
             )}
@@ -654,6 +646,7 @@ export default function OracleInterface() {
         </footer>
       </div>
 
+      {/* CSS styles remain exactly the same - no changes needed */}
       <style jsx>{`
         .container {
           max-width: 800px;
@@ -894,7 +887,7 @@ export default function OracleInterface() {
           border: 1px solid #ffeaa7;
         }
 
-        /* 其他现有样式 */
+        /* All other existing CSS styles remain exactly the same */
         .header {
           text-align: center;
           margin-bottom: 40px;
