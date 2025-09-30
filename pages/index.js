@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 
 export default function OracleInterface() {
@@ -16,14 +16,18 @@ export default function OracleInterface() {
   const [backendRetryCount, setBackendRetryCount] = useState(0)
   const [conversationHistory, setConversationHistory] = useState([])
 
+  // 修复：使用 useRef 来保持会话ID的稳定性
+  const sessionIdRef = useRef(null)
+
   useEffect(() => {
-    // Session management
+    // Session management - 修复：确保会话ID稳定
     let id = sessionStorage.getItem('oracle_session_id')
     if (!id) {
-      id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
+      id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
       sessionStorage.setItem('oracle_session_id', id)
     }
     setSessionId(id)
+    sessionIdRef.current = id
     
     // Record visit
     recordVisit(id)
@@ -45,7 +49,11 @@ export default function OracleInterface() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ session_id: sessionId })
+        body: JSON.stringify({ 
+          session_id: sessionId,
+          ip: 'unknown',
+          user_agent: navigator.userAgent
+        })
       })
     } catch (error) {
       console.log('Visit recording failed (backend might be offline)')
@@ -86,8 +94,7 @@ export default function OracleInterface() {
   const checkApiStatus = async () => {
     try {
       const response = await fetch('https://chrysopoeia-oracle.onrender.com/health', {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
+        method: 'GET'
       })
       setApiStatus(response.ok ? 'online' : 'offline')
       setBackendRetryCount(0)
@@ -147,13 +154,20 @@ export default function OracleInterface() {
   const askOracle = async () => {
     if (!question.trim()) return
     setLoading(true)
+    
     try {
+      // 修复：确保使用稳定的sessionId
+      const currentSessionId = sessionIdRef.current || sessionId
+      
       // Build request with conversation history
       const requestData = {
         question: question,
         conversation_history: conversationHistory.slice(-5),
-        session_id: sessionId
+        session_id: currentSessionId
       }
+
+      console.log('Sending request with session:', currentSessionId)
+      console.log('Conversation history length:', conversationHistory.length)
 
       const response = await fetch('https://chrysopoeia-oracle.onrender.com/oracle', {
         method: 'POST',
@@ -161,16 +175,17 @@ export default function OracleInterface() {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(requestData),
-        signal: AbortSignal.timeout(15000)
+        body: JSON.stringify(requestData)
       })
       
       if (!response.ok) throw new Error(`HTTP Error! Status: ${response.status}`)
       
       const data = await response.json()
       
-      // Update conversation history
-      const newConversation = {
+      console.log('Received response:', data)
+      
+      // 修复：正确更新对话历史
+      const newConversationEntry = {
         question: question,
         response: data.oracle,
         timestamp: new Date().toISOString(),
@@ -178,9 +193,13 @@ export default function OracleInterface() {
         thinkingProcess: data.thinking_process
       }
       
-      setConversationHistory(prev => [...prev, newConversation].slice(-10))
+      setConversationHistory(prev => {
+        const updatedHistory = [...prev, newConversationEntry]
+        console.log('Updated conversation history:', updatedHistory)
+        return updatedHistory.slice(-10) // 保持最近10轮对话
+      })
       
-      // Risk detection logic (now mainly relies on backend)
+      // Risk detection logic
       const highRiskKeywords = [
         'predict', 'forecast', 'future', 'fate', 'destiny', 'fortune', 'tomorrow', 'next week', 'next month', 'next year',
         'stars', 'zodiac', 'astrology', 'tarot', 'divination', 'psychic', 'supernatural',
@@ -193,12 +212,12 @@ export default function OracleInterface() {
       );
       
       // Record question to statistics
-      recordQuestion(sessionId, question, data.event_type, detectLanguage(question), data.event_type, data.entropy)
+      recordQuestion(currentSessionId, question, data.event_type, detectLanguage(question), data.event_type, data.entropy)
       
       // Record real-time demo logs
       const newLog = {
         timestamp: new Date().toISOString(),
-        sessionId: sessionId,
+        sessionId: currentSessionId,
         event_type: data.event_type,
         question: question,
         response: data.oracle,
@@ -221,6 +240,10 @@ export default function OracleInterface() {
         thinkingProcess: data.thinking_process,
         contextUsed: data.context_used || false
       })
+      
+      // 清空输入框
+      setQuestion('')
+      
     } catch (error) {
       console.error('API call error:', error)
       setAnswer({
@@ -256,14 +279,14 @@ export default function OracleInterface() {
       ].slice(0, 15)
       setLogs(allLogs)
       setShowLogs(true)
+      setShowAdminPanel(false)
       return
     }
     
     // Production environment password verification
     try {
-      const encodedPassword = encodeURIComponent(password)
       const response = await fetch(
-        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodedPassword}`
+        `https://chrysopoeia-oracle.onrender.com/ethical-logs?password=${encodeURIComponent(password)}`
       )
       
       if (!response.ok) {
@@ -277,6 +300,7 @@ export default function OracleInterface() {
       const data = await response.json()
       setLogs(data.logs || [])
       setShowLogs(true)
+      setShowAdminPanel(false)
       
       if (isDemoMode) {
         alert('✅ Switched to admin mode, showing real log data')
@@ -329,6 +353,14 @@ export default function OracleInterface() {
     alert(feedbackMessages[type] || 'Thank you for your feedback!')
   }
 
+  // 修复：添加键盘事件支持
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      askOracle()
+    }
+  }
+
   return (
     <>
       <Head>
@@ -373,6 +405,18 @@ export default function OracleInterface() {
                   <div className={`oracle-response ${conv.isVerifiable ? 'truthful' : 'deceptive'}`}>
                     <strong>Oracle:</strong> {conv.response}
                   </div>
+                  {conv.thinkingProcess && (
+                    <div className="thinking-process-mini">
+                      <details>
+                        <summary>🤔 Thinking Process</summary>
+                        <div className="mini-process">
+                          <div>📝 {conv.thinkingProcess.contextAnalysis}</div>
+                          <div>😊 {conv.thinkingProcess.emotionDetection}</div>
+                          <div>⚖️ {conv.thinkingProcess.truthDecision}</div>
+                        </div>
+                      </details>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -384,10 +428,11 @@ export default function OracleInterface() {
             <textarea 
               value={question} 
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask the oracle profound philosophical questions..."
+              onKeyPress={handleKeyPress}
+              placeholder="Ask the oracle profound philosophical questions... (Press Enter to send)"
               rows={3}
             />
-            <button onClick={askOracle} disabled={loading}>
+            <button onClick={askOracle} disabled={loading || !question.trim()}>
               {loading ? '🔄 Thinking...' : '🔮 Consult Oracle'}
             </button>
           </div>
@@ -501,19 +546,19 @@ export default function OracleInterface() {
             <h3>📊 System Statistics</h3>
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-number">{adminStats.total_visits}</div>
+                <div className="stat-number">{adminStats.total_visits || 0}</div>
                 <div className="stat-label">Total Visits</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{adminStats.unique_visitors}</div>
+                <div className="stat-number">{adminStats.unique_visitors || 0}</div>
                 <div className="stat-label">Unique Visitors</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{adminStats.total_questions}</div>
+                <div className="stat-number">{adminStats.total_questions || 0}</div>
                 <div className="stat-label">Total Questions</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{adminStats.active_users_24h}</div>
+                <div className="stat-number">{adminStats.active_users_24h || 0}</div>
                 <div className="stat-label">24h Active Users</div>
               </div>
             </div>
@@ -525,7 +570,7 @@ export default function OracleInterface() {
                   {adminStats.response_stats.map((stat, index) => (
                     <div key={index} className="stat-bar">
                       <div className="stat-bar-label">
-                        <span>{stat.type === 'DECEPTION' ? '⚠️ Creative Response' : '✅ Truthful Answer'}</span>
+                        <span>{stat.type === 'deceptive' ? '⚠️ Creative Response' : '✅ Truthful Answer'}</span>
                         <span>{stat.count} times</span>
                       </div>
                       <div className="stat-bar-track">
@@ -540,20 +585,36 @@ export default function OracleInterface() {
               </div>
             )}
 
-            <div className="recent-questions">
-              <h4>Recent Questions ({adminStats.recent_questions.length})</h4>
-              <div className="questions-list">
-                {adminStats.recent_questions.map((q, index) => (
-                  <div key={index} className="question-item">
-                    <div className="question-text">{q.question}</div>
-                    <div className="question-meta">
-                      <span>{new Date(q.timestamp).toLocaleString('en-US')}</span>
-                      <span>Session: {q.session_id}</span>
+            {adminStats.recent_questions && adminStats.recent_questions.length > 0 && (
+              <div className="recent-questions">
+                <h4>Recent Questions ({adminStats.recent_questions.length})</h4>
+                <div className="questions-list">
+                  {adminStats.recent_questions.map((q, index) => (
+                    <div key={index} className="question-item">
+                      <div className="question-text">{q.question}</div>
+                      <div className="question-meta">
+                        <span>{new Date(q.timestamp).toLocaleString('en-US')}</span>
+                        <span>Session: {q.session_id}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {adminStats.user_distribution && (
+              <div className="user-distribution">
+                <h4>User Activity Distribution</h4>
+                <div className="distribution-bars">
+                  {adminStats.user_distribution.map((dist, index) => (
+                    <div key={index} className="dist-item">
+                      <span className="dist-range">{dist.range} questions</span>
+                      <span className="dist-count">{dist.count} users</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -587,7 +648,7 @@ export default function OracleInterface() {
                         </span>
                       </div>
                       <div className="log-content">
-                        <p><strong>Session ID:</strong> {log.sessionId || 'Unknown session'}</p>
+                        <p><strong>Session ID:</strong> {log.sessionId || log.session_id || 'Unknown session'}</p>
                         <p><strong>Question:</strong> {log.question || 'None'}</p>
                         <p><strong>Response:</strong> {log.response || 'None'}</p>
                         {log.reason && (
@@ -646,7 +707,6 @@ export default function OracleInterface() {
         </footer>
       </div>
 
-      {/* CSS styles remain exactly the same - no changes needed */}
       <style jsx>{`
         .container {
           max-width: 800px;
@@ -698,6 +758,30 @@ export default function OracleInterface() {
           color: #e74c3c;
           border-left: 2px solid #e74c3c;
           padding-left: 10px;
+        }
+        
+        .thinking-process-mini {
+          margin-top: 8px;
+          padding: 8px;
+          background: #f5f5f5;
+          border-radius: 6px;
+          font-size: 0.8em;
+        }
+        
+        .thinking-process-mini details summary {
+          cursor: pointer;
+          font-weight: bold;
+          color: #666;
+        }
+        
+        .mini-process {
+          margin-top: 5px;
+          padding-left: 10px;
+        }
+        
+        .mini-process div {
+          margin: 3px 0;
+          font-size: 0.9em;
         }
         
         .thinking-process {
@@ -859,6 +943,35 @@ export default function OracleInterface() {
           color: #666;
         }
         
+        .user-distribution {
+          margin: 20px 0;
+        }
+        
+        .distribution-bars {
+          background: white;
+          padding: 15px;
+          border-radius: 8px;
+        }
+        
+        .dist-item {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee;
+        }
+        
+        .dist-item:last-child {
+          border-bottom: none;
+        }
+        
+        .dist-range {
+          font-weight: 500;
+        }
+        
+        .dist-count {
+          color: #666;
+        }
+        
         .contact-info {
           margin-top: 20px;
           padding: 15px;
@@ -887,7 +1000,6 @@ export default function OracleInterface() {
           border: 1px solid #ffeaa7;
         }
 
-        /* All other existing CSS styles remain exactly the same */
         .header {
           text-align: center;
           margin-bottom: 40px;
